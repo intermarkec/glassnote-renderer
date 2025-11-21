@@ -1,16 +1,24 @@
+import { PositionManager } from './glass/position-manager';
+import { HTMLProcessor } from './glass/html-processor';
+import { SVGProcessor } from './glass/svg-processor';
+import { ImageProcessor } from './glass/image-processor';
+
 // Basic Glass system implementation for TypeScript + Vue migration
 
 // Glass class implementation compatible with review transactions
 class Glass {
   private url: string | null
   private message: any
-  private element: HTMLElement | null = null
+  public element: HTMLElement | null = null
   private durationTimeout: NodeJS.Timeout | null = null
   private positionKey: string | null = null
+  private positionManager: PositionManager;
+  public formResponse?: any;
 
   constructor(url: string | null, message: any) {
     this.url = url
     this.message = message
+    this.positionManager = new PositionManager();
     this.handleGlassDisplay()
   }
 
@@ -47,6 +55,7 @@ class Glass {
   }
 
   private initialize(): void {
+    const self = this;
     // Create main container
     this.element = document.createElement('div')
     this.element.style.position = 'fixed'
@@ -65,14 +74,23 @@ class Glass {
     this.setupPositioning(glassContent)
     
     // Add content based on message type
-    this.renderContent(glassContent)
+    const data = this.message.data;
+    const uploads = JSON.parse(data.uploads);
+    const upload = uploads[0];
+    const processor = this._getContentProcessor(upload.mimetype, data);
 
-    // Add to DOM
-    this.element.appendChild(glassContent)
-    document.body.appendChild(this.element)
+    processor.process(glassContent, data, upload)
+        .then(function() {
+            // Finalizar configuración
+            self.element.appendChild(glassContent)
+            document.body.appendChild(self.element)
+            self.startFadeIn(glassContent)
+        })
+        .catch((e) => {
+          console.error('Error processing content:', JSON.stringify(e));
+          self.cleanup();
+        });
 
-    // Start fade in animation
-    this.startFadeIn(glassContent)
 
     // Set up auto-removal if duration is specified
     if (this.message.data.duration) {
@@ -80,6 +98,17 @@ class Glass {
         this.finishGlass()
       }, this.message.data.duration * 1000)
     }
+  }
+
+  private _getContentProcessor(mimetype: string, messageData: any): HTMLProcessor | SVGProcessor | ImageProcessor {
+      // Prioritize messageType over mimetype for determining the processor
+      if (messageData.messageType === 'html' || messageData.messageType === 'form') {
+          return new HTMLProcessor(this);
+      } else if (mimetype === 'image/svg+xml') {
+          return new SVGProcessor(this);
+      } else {
+          return new ImageProcessor(this);
+      }
   }
 
   private createGlassContent(): HTMLElement {
@@ -100,32 +129,17 @@ class Glass {
 
   private setupPositioning(glassContent: HTMLElement): void {
     try {
-      const position = JSON.parse(this.message.data.position || '{"h":1,"v":1}')
-      
-      // Basic positioning implementation
-      const positionMap = {
-        '0': { h: 'left', v: 'top' },
-        '1': { h: 'center', v: 'center' },
-        '2': { h: 'right', v: 'bottom' }
-      }
-      
-      const hPos = positionMap[position.h as keyof typeof positionMap] || positionMap[1]
-      const vPos = positionMap[position.v as keyof typeof positionMap] || positionMap[1]
-      
-      glassContent.style.left = hPos.h === 'left' ? '0' : hPos.h === 'right' ? 'auto' : '50%'
-      glassContent.style.right = hPos.h === 'right' ? '0' : 'auto'
-      glassContent.style.top = vPos.v === 'top' ? '0' : vPos.v === 'bottom' ? 'auto' : '50%'
-      glassContent.style.bottom = vPos.v === 'bottom' ? '0' : 'auto'
-      glassContent.style.transform = hPos.h === 'center' || vPos.v === 'center' ? 'translate(-50%, -50%)' : 'none'
-      glassContent.style.transformOrigin = hPos.h + ' ' + vPos.v
-      
+      const position = JSON.parse(this.message.data.position || '{"h":1,"v":1}');
+      this.positionManager.positionElement(glassContent, position);
+      const pos = this.positionManager.getPositionStrings(position);
+      glassContent.style.transformOrigin = pos.hOrigin + ' ' + pos.vOrigin;
     } catch (error) {
-      console.error('Error setting up positioning:', error)
+      console.error('Error setting up positioning:', error);
       // Fallback to center positioning
-      glassContent.style.left = '50%'
-      glassContent.style.top = '50%'
-      glassContent.style.transform = 'translate(-50%, -50%)'
-      glassContent.style.transformOrigin = 'center center'
+      glassContent.style.left = '50%';
+      glassContent.style.top = '50%';
+      glassContent.style.transform = 'translate(-50%, -50%)';
+      glassContent.style.transformOrigin = 'center center';
     }
   }
 
@@ -144,117 +158,7 @@ class Glass {
     }, 50)
   }
 
-  private renderContent(glassContent: HTMLElement): void {
-    const data = this.message.data
-
-    switch (data.messageType) {
-      case 'html':
-        this.renderHTML(glassContent, data)
-        break
-      case 'image':
-        this.renderImage(glassContent, data)
-        break
-      case 'news':
-        this.renderNews(glassContent, data)
-        break
-      case 'form':
-        this.renderForm(glassContent, data)
-        break
-      default:
-        this.renderDefault(glassContent, data)
-    }
-  }
-
-  private renderHTML(glassContent: HTMLElement, data: any): void {
-    try {
-      const parameters = JSON.parse(data.parameters || '[]')
-      const htmlParam = parameters.find((p: any) => p.label === 'html')
-      
-      if (htmlParam && htmlParam.value) {
-        glassContent.innerHTML = htmlParam.value
-          .replace('%VERSION%', window.rendererVersion || '1.0.0')
-      }
-    } catch (error) {
-      console.error('Error rendering HTML glass:', error)
-      this.renderDefault(glassContent, data)
-    }
-  }
-
-  private renderImage(glassContent: HTMLElement, data: any): void {
-    try {
-      // Parse uploads JSON to get the actual file path
-      const uploads = JSON.parse(data.uploads || '[]')
-      if (uploads && uploads.length > 0) {
-        const upload = uploads[0]
-        const img = document.createElement('img')
-        img.src = data.baseUrl + upload.path
-        img.style.maxWidth = '90%'
-        img.style.maxHeight = '90%'
-        img.style.objectFit = 'contain'
-        
-        glassContent.appendChild(img)
-      } else {
-        console.error('No uploads found in transaction data')
-        this.renderDefault(glassContent, data)
-      }
-    } catch (error) {
-      console.error('Error rendering image glass:', error)
-      this.renderDefault(glassContent, data)
-    }
-  }
-
-  private renderNews(glassContent: HTMLElement, data: any): void {
-    const newsDiv = document.createElement('div')
-    newsDiv.style.background = 'rgba(0, 0, 0, 0.8)'
-    newsDiv.style.color = 'white'
-    newsDiv.style.padding = '20px'
-    newsDiv.style.borderRadius = '10px'
-    newsDiv.style.maxWidth = '80%'
-    newsDiv.style.maxHeight = '80%'
-    newsDiv.style.overflow = 'auto'
-    newsDiv.style.textAlign = 'center'
-    
-    newsDiv.textContent = data.content || 'News content'
-    
-    glassContent.appendChild(newsDiv)
-  }
-
-  private renderForm(glassContent: HTMLElement, data: any): void {
-    const formDiv = document.createElement('div')
-    formDiv.style.background = 'rgba(0, 0, 0, 0.8)'
-    formDiv.style.color = 'white'
-    formDiv.style.padding = '20px'
-    formDiv.style.borderRadius = '10px'
-    formDiv.style.maxWidth = '80%'
-    formDiv.style.maxHeight = '80%'
-    formDiv.style.overflow = 'auto'
-    
-    formDiv.innerHTML = `
-      <h3>Form</h3>
-      <p>Form functionality would be implemented here</p>
-    `
-    
-    glassContent.appendChild(formDiv)
-  }
-
-  private renderDefault(glassContent: HTMLElement, data: any): void {
-    const defaultDiv = document.createElement('div')
-    defaultDiv.style.background = 'rgba(0, 0, 0, 0.8)'
-    defaultDiv.style.color = 'white'
-    defaultDiv.style.padding = '20px'
-    defaultDiv.style.borderRadius = '10px'
-    defaultDiv.style.textAlign = 'center'
-    
-    defaultDiv.innerHTML = `
-      <h3>Glass Message</h3>
-      <p>Type: ${data.messageType}</p>
-      <p>ID: ${data.id}</p>
-    `
-    
-    glassContent.appendChild(defaultDiv)
-  }
-
-  private finishGlass(): void {
+  public finishGlass(): void {
     if (!this.element) return
     
     const glassContent = this.element.querySelector('.glass-content') as HTMLElement
