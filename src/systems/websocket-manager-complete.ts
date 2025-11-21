@@ -144,6 +144,22 @@ function setupStandardWebSocketHandlers(ws: WebSocket, url: string): void {
   }
   
   ws.onmessage = function(event: MessageEvent) {
+    // First try to parse the message to check if it's a review response
+    try {
+      const message = JSON.parse(event.data);
+      
+      // If it's a review response and there's a global handler, let the ConfigMenu handle it
+      if (message.event === 'review' && Array.isArray(message.data) && window._handleWebSocketMessage) {
+        console.log('WebSocketManager: Passing review response to global handler for URL:', url)
+        window._handleWebSocketMessage(url, event)
+        return
+      }
+    } catch (error) {
+      // If parsing fails, continue with normal handling
+    }
+    
+    // For all other messages, use the internal handler
+    console.log('WebSocketManager: Using internal message handler for URL:', url)
     handleWebSocketMessage(url, event)
   }
 }

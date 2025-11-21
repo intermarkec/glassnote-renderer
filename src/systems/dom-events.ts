@@ -225,48 +225,81 @@ document.addEventListener('DOMContentLoaded', function() {
   document.body.addEventListener('mousemove', detectPresenceHandler)
   document.body.addEventListener('pointerdown', detectPresenceHandler)
 
-  const template = `<div
-  style="width: 450px; height: 450px; background: linear-gradient(135deg, rgb(76, 45, 85) 0%, rgb(76, 29, 122) 100%); border-radius: 5%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; font-family: Arial, sans-serif; box-shadow: rgba(0, 0, 0, 0.3) 0px 10px 30px; font-size: 100px;" > 
+  // Function to load splash HTML template
+  function loadSplashTemplate(): Promise<string> {
+    return fetch('./splash.html')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to load splash template')
+        }
+        return response.text()
+      })
+      .catch(error => {
+        console.error('Error loading splash template:', error)
+        // Fallback to inline template
+        return `<div
+  style="width: 450px; height: 450px; background: linear-gradient(135deg, rgb(76, 45, 85) 0%, rgb(76, 29, 122) 100%); border-radius: 5%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; font-family: Arial, sans-serif; box-shadow: rgba(0, 0, 0, 0.3) 0px 10px 30px; font-size: 100px;" >
   
-  <img src=" logo.svg" style="width: 40%; height: auto; margin: 3%;" alt="Splash">
+  <img src="./logo.svg" style="width: 40%; height: auto; margin: 3%;" alt="Splash">
 
   <p style="font-size: 0.3em; margin: 0;">%VERSION%</p>
   <div
       style="margin-top: 5%; width: 45%; height: 45%; background: rgba(253, 240, 240, 1); border-radius: 50%; display: flex; justify-content: center; align-items: center; animation: pulse 2s infinite;">
-      <img src="imago.svg" style="width: 60%; height: auto;" alt="Splash">
-  </div>   
+      <img src="./imago.svg" style="width: 60%; height: auto;" alt="Splash">
+  </div>
 </div>
-<style> @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } } </style>
-`
-
-  // Create glass with specified configuration when page loads
-  const glassConfig = {
-    event: 'message',
-    data: {
-      id: 6635,
-      messageId: 'preview-6635', // Add messageId for duplicate detection
-      type: 'PREVIEW',
-      uploads: '[{"id":"3ad42722-742a-442a-af8d-429f638bbf00","path":"splash.svg","mimetype":"image/svg+xml"}]',
-      position: '{"h":1,"v":1}',
-      duration: 5,
-      transparency: '0.80',
-      isUserDevice: false,
-      needPresent: false,
-      askConfirmation: false,
-      isAsyncronous: false,
-      baseUrl: './',
-      parameters: JSON.stringify([{"label":"html","value":template}]),
-      messageType: 'html',
-    },
+<style> @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } } </style>`
+      })
   }
 
-  // Create glass with the configuration using the modified Glass constructor
-  // This ensures preview messages go through the unified queue and duplicate detection
-  // Use null for URL since this is a local preview
-  // Launch splash after 1 second delay
-  setTimeout(function() {
-    new window.Glass(null, glassConfig)
-  }, 50)
+  // Global function to show splash
+  window.showSplash = function(): void {
+    console.log('showSplash function called')
+    loadSplashTemplate().then((template) => {
+      console.log('Splash template loaded successfully')
+      const glassConfig = {
+        event: 'message',
+        data: {
+          id: 6635,
+          messageId: 'preview-6635', // Add messageId for duplicate detection
+          type: 'PREVIEW',
+          uploads: '[{"id":"3ad42722-742a-442a-af8d-429f638bbf00","path":"splash.svg","mimetype":"image/svg+xml"}]',
+          position: '{"h":1,"v":1}',
+          duration: 5,
+          transparency: '0.80',
+          isUserDevice: false,
+          needPresent: false,
+          askConfirmation: false,
+          isAsyncronous: false,
+          baseUrl: './',
+          parameters: JSON.stringify([{"label":"html","value":template}]),
+          messageType: 'html',
+        },
+      }
+
+      console.log('Creating glass with config:', glassConfig)
+
+      // Create glass with the configuration using the modified Glass constructor
+      // This ensures preview messages go through the unified queue and duplicate detection
+      // Use null for URL since this is a local preview
+      if (window.Glass) {
+        console.log('Glass constructor available, creating glass')
+        new window.Glass(null, glassConfig)
+        console.log('Glass created successfully')
+      } else {
+        console.error('Glass constructor not available')
+      }
+    }).catch((error) => {
+      console.error('Failed to load splash template:', error)
+    })
+  }
+
+  // Show splash immediately on DOM ready (for backward compatibility)
+  setTimeout(() => {
+    if (window.showSplash) {
+      window.showSplash()
+    }
+  }, 100)
   
   const testButton = document.getElementById('testButton')
   if (testButton) {

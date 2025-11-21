@@ -30,7 +30,9 @@ declare global {
     getURLParameter: (name: string) => string | null
     handleScreenEvent: (event: string) => void
     showConfigMenu: () => void
+    showSplash: () => void
     removeFromUnifiedQueue: (messageId: string) => void
+    toggleConfigMenu: (view?: string) => void
     connectWebSocket: (url: string) => Promise<void>
     getConnectionStatus: (url: string) => any
     getAllConnectionsStatus: () => any
@@ -39,6 +41,9 @@ declare global {
     
     // WebSocket manager
     websocketManager: any
+    handleWebSocketMessage: (url: string, event: MessageEvent) => Promise<void>
+    _handleWebSocketMessage?: (url: string, event: MessageEvent) => Promise<void>
+    _originalHandleWebSocketMessage?: (url: string, event: MessageEvent) => Promise<void>
     
     // Glass system
     glassSystem: any
@@ -51,6 +56,12 @@ declare global {
       getUserData: (key: string, nestedKey?: string) => Promise<any>
       setUserData: (key: string, nestedKey?: string, value?: any) => Promise<void>
       removeUserData: (key: string, nestedKey?: string) => Promise<void>
+      openExternal: (url: string) => void
+      openExternalBrowser: (url: string) => void
+      openRegistrationWindow: (url: string) => void
+      showWindow: () => void
+      hideWindow: () => void
+      getOSInfo: () => any
     }
     
     // Android Bridge
@@ -78,10 +89,12 @@ declare global {
       remove: (key: string, nestedKey?: string) => Promise<boolean>
       addServer: (serverUrl: string) => Promise<boolean>
       handleRegistrationResponse: (serverUrl: string, refreshToken: string, refreshTokenHash?: string) => Promise<boolean>
+      getConfig: () => Promise<any>
+      setConfig: (config: any) => Promise<boolean>
     }
     
     // Config menu
-    _configMenuInstance?: any
+    _configMenuInstance?: import('../systems/config-menu/config-menu').ConfigMenu
     ConfigMenu?: any
     
     // Compatibility
@@ -106,6 +119,10 @@ declare global {
     
     // Electron handlers
     initializeElectronHandlers?: () => void
+    
+    // Registration functions
+    requestRegistrationCode?: () => void
+    closeRegistrationConnection?: () => void
     
     // Glass system
     Glass?: any

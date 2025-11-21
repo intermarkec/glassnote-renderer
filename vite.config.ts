@@ -10,9 +10,11 @@ export default defineConfig({
       output: {
         manualChunks: undefined
       }
+    },
+    watch: {
+      include: ['src/**']
     }
   },
-  server: {
-    port: 3000
-  }
+  publicDir: 'public',
+  base: './' // Use relative paths for Electron
 })

@@ -34,4 +34,8 @@ app.config.globalProperties.$config = window.config
 app.config.globalProperties.$websocketManager = window.websocketManager
 app.config.globalProperties.$glassSystem = window.glassSystem
 
+console.log('Vue app created, mounting to #app')
+
 app.mount('#app')
+
+console.log('Vue app mounted successfully')

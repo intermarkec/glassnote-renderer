@@ -13,6 +13,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { initializeElectronBridge } from './systems/electron-bridge'
 
 const keycodeText = ref('')
 const keycodeStyle = computed(() => {
@@ -37,17 +38,40 @@ const keycodeStyle = computed(() => {
 })
 
 onMounted(() => {
+  console.log('App.vue mounted - starting initialization')
+  
+  // Initialize Electron bridge
+  console.log('Initializing Electron bridge')
+  initializeElectronBridge()
+  
   // Initialize systems after component is mounted
   if (window.appInit) {
+    console.log('Calling appInit()')
     window.appInit()
+  } else {
+    console.log('appInit not available')
   }
   
   // Set up keycode display
   if (window.setKeycodeText) {
+    console.log('Setting up keycode display')
     window.setKeycodeText = (text: string) => {
       keycodeText.value = text
     }
+  } else {
+    console.log('setKeycodeText not available')
   }
+
+  // Show splash after Vue is fully mounted and systems are initialized
+  setTimeout(() => {
+    console.log('Attempting to show splash')
+    if (window.showSplash) {
+      console.log('Calling showSplash()')
+      window.showSplash()
+    } else {
+      console.log('showSplash not available')
+    }
+  }, 100)
 })
 </script>
 
