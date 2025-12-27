@@ -123,6 +123,7 @@ declare global {
     // Registration functions
     requestRegistrationCode?: () => void
     closeRegistrationConnection?: () => void
+    handleRegisterButtonClick?: () => void
     
     // Glass system
     Glass?: any

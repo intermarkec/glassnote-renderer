@@ -5,7 +5,7 @@ export const configMenuStyles = `
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.8);
+  background: transparent;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -21,8 +21,9 @@ export const configMenuStyles = `
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 20px 20px 60px #bebebe, -20px -20px 60px #ffffff;
+  box-shadow: none;
   position: relative;
+  border: 1px solid #d1d9e6;
 }
 
 .config-menu-header {
@@ -51,7 +52,7 @@ export const configMenuStyles = `
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 4px 4px 8px #b8bec7, -4px -4px 8px #ffffff;
+  box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
   transition: all 0.2s ease;
   font-size: 20px;
   color: #5a5590;
@@ -59,11 +60,11 @@ export const configMenuStyles = `
 
 .close-button:hover {
   transform: scale(1.1);
-  box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
+  box-shadow: 1px 1px 2px #b8bec7, -1px -1px 2px #ffffff;
 }
 
 .close-button:active {
-  box-shadow: inset 2px 2px 4px #b8bec7, inset -2px -2px 4px #ffffff;
+  box-shadow: inset 1px 1px 2px #b8bec7, inset -1px -1px 2px #ffffff;
 }
 
 .config-menu-content {
@@ -88,25 +89,25 @@ export const configMenuStyles = `
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 4px 4px 8px #b8bec7, -4px -4px 8px #ffffff;
+  box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
 }
 
 .view-button.active {
-  box-shadow: inset 2px 2px 4px #5a5590, inset -2px -2px 4px #9c97c2;
+  box-shadow: inset 1px 1px 2px #5a5590, inset -1px -1px 2px #9c97c2;
   color: #ffffff;
   background: linear-gradient(145deg, #5a5590, #7a75b0);
 }
 
 .view-button:hover:not(.active) {
   transform: translateY(-2px);
-  box-shadow: 6px 6px 12px #b8bec7, -6px -6px 12px #ffffff;
+  box-shadow: 3px 3px 6px #b8bec7, -3px -3px 6px #ffffff;
 }
 
 .view-content {
   background: #f0f3f7;
   border-radius: 15px;
   padding: 20px;
-  box-shadow: inset 2px 2px 5px #b8bec7, inset -2px -2px 5px #ffffff;
+  box-shadow: inset 1px 1px 3px #b8bec7, inset -1px -1px 3px #ffffff;
 }
 
 .review-section {
@@ -119,7 +120,7 @@ export const configMenuStyles = `
   background: #e0e5ec;
   border-radius: 10px;
   padding: 15px;
-  box-shadow: 4px 4px 8px #b8bec7, -4px -4px 8px #ffffff;
+  box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
 }
 
 .review-item-header {
@@ -169,11 +170,52 @@ export const configMenuStyles = `
   gap: 15px;
 }
 
+.config-title {
+  color: #333;
+  margin-bottom: 30px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.config-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+}
+
+.config-button {
+  padding: 15px 30px;
+  background-color: #e0e5ec;
+  color: #5a6c8d;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  min-width: 220px;
+  box-shadow: 8px 8px 16px #b8bec7, -8px -8px 16px #ffffff;
+  transition: all 0.2s cubic-bezier(.25,.8,.25,1);
+}
+
+.config-button:hover {
+  background-color: #e0e5ec;
+  color: #7b76b9;
+  box-shadow: 4px 4px 8px #b8bec7, -4px -4px 8px #ffffff;
+  transform: translateY(1px);
+}
+
+.config-button:active {
+  box-shadow: inset 4px 4px 8px #b8bec7, inset -4px -4px 8px #ffffff;
+  transform: translateY(2px);
+}
+
 .config-group {
   background: #e0e5ec;
   border-radius: 10px;
   padding: 15px;
-  box-shadow: 4px 4px 8px #b8bec7, -4px -4px 8px #ffffff;
+  box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
 }
 
 .config-group-title {
@@ -210,7 +252,7 @@ export const configMenuStyles = `
   padding: 8px 12px;
   font-size: 14px;
   color: #333;
-  box-shadow: inset 2px 2px 4px #b8bec7, inset -2px -2px 4px #ffffff;
+  box-shadow: inset 1px 1px 2px #b8bec7, inset -1px -1px 2px #ffffff;
   transition: all 0.2s ease;
   width: 200px;
 }
@@ -219,7 +261,7 @@ export const configMenuStyles = `
 .config-select:focus,
 .config-textarea:focus {
   outline: none;
-  box-shadow: inset 2px 2px 4px #5a5590, inset -2px -2px 4px #9c97c2;
+  box-shadow: inset 1px 1px 2px #5a5590, inset -1px -1px 2px #9c97c2;
 }
 
 .config-textarea {
@@ -271,16 +313,16 @@ export const configMenuStyles = `
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 8px 8px 16px #b8bec7, -8px -8px 16px #ffffff;
+  box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
 }
 
 .action-button:hover {
   transform: translateY(-2px);
-  box-shadow: 10px 10px 20px #b8bec7, -10px -10px 20px #ffffff;
+  box-shadow: 3px 3px 6px #b8bec7, -3px -3px 6px #ffffff;
 }
 
 .action-button:active {
-  box-shadow: inset 4px 4px 8px #b8bec7, inset -4px -4px 8px #ffffff;
+  box-shadow: inset 2px 2px 4px #b8bec7, inset -2px -2px 4px #ffffff;
 }
 
 .action-button.primary {
@@ -360,7 +402,7 @@ export const configMenuStyles = `
   border-radius: 12px;
   overflow: hidden;
   background-color: #e0e5ec;
-  box-shadow: 4px 4px 8px #b8bec7, -4px -4px 8px #ffffff;
+  box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
 }
 
 .transactions-table th {
@@ -370,14 +412,14 @@ export const configMenuStyles = `
   background-color: #e0e5ec;
   font-weight: 600;
   color: #5a6c8d;
-  box-shadow: inset 2px 2px 4px #b8bec7, inset -2px -2px 4px #ffffff;
+  box-shadow: inset 1px 1px 2px #b8bec7, inset -1px -1px 2px #ffffff;
 }
 
 .transactions-table td {
   padding: 12px 10px;
   background-color: #e0e5ec;
   border-radius: 10px;
-  box-shadow: 2px 2px 6px #b8bec7, -2px -2px 6px #ffffff;
+  box-shadow: 1px 1px 3px #b8bec7, -1px -1px 3px #ffffff;
 }
 
 .date-cell {
@@ -408,7 +450,7 @@ export const configMenuStyles = `
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
   transition: all 0.2s ease;
 }
 

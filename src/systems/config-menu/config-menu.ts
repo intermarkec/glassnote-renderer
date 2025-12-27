@@ -120,19 +120,14 @@ export class ConfigMenu {
         
         <div class="config-menu-content">
           <div class="view-buttons">
-            <button class="view-button ${this.currentView === 'review' ? 'active' : ''}" 
+            <button class="view-button ${this.currentView === 'review' ? 'active' : ''}"
                     data-view="review">Revisión</button>
-            <button class="view-button ${this.currentView === 'config' ? 'active' : ''}" 
+            <button class="view-button ${this.currentView === 'config' ? 'active' : ''}"
                     data-view="config">Configuración</button>
           </div>
           
           <div class="view-content" id="viewContent">
             <!-- Content will be populated by views -->
-          </div>
-          
-          <div class="action-buttons">
-            <button class="action-button primary" data-action="save">Guardar</button>
-            <button class="action-button" data-action="cancel">Cancelar</button>
           </div>
         </div>
       </div>
@@ -226,6 +221,23 @@ export class ConfigMenu {
       case 'cancel':
         this.hide();
         break;
+      case 'request-code':
+        if (typeof window.requestRegistrationCode === 'function') {
+          window.requestRegistrationCode();
+        }
+        break;
+      case 'hide-code':
+        if (typeof window.closeRegistrationConnection === 'function') {
+          window.closeRegistrationConnection();
+        }
+        break;
+      case 'register':
+        if (typeof window.handleRegisterButtonClick === 'function') {
+          window.handleRegisterButtonClick();
+        }
+        // Close config menu after opening registration URL
+        this.hide();
+        break;
     }
   }
 
@@ -271,18 +283,8 @@ export class ConfigMenu {
 
   private saveConfig(): void {
     try {
-      if (this.currentView === 'config') {
-        const updatedConfig = this.configView.getConfigData();
-        this.configData = { ...this.configData, ...updatedConfig };
-      }
-
-      // Save config using available APIs
-      if (window.electronAPI) {
-        window.electronAPI.send('save-config', this.configData);
-      } else if (window.userDataManager) {
-        window.userDataManager.setConfig(this.configData);
-      }
-
+      // No config data to save in the simplified config view
+      // Just hide the menu
       this.hide();
     } catch (error) {
       console.error('Error saving config:', error);

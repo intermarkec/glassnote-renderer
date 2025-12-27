@@ -1,58 +1,50 @@
 export class ScaleCalculator {
+  private referenceWidth = 1920;
+  private referenceHeight = 1080;
+  private mobileBreakpoint = 768;
+
   calculateScaleFactor(): number {
-    const isMobile = this.isMobile();
-    const baseWidth = 1920;
-    const baseHeight = 1080;
+    const currentWidth = window.innerWidth;
+    const currentHeight = window.innerHeight;
+
+    const widthRatio = currentWidth / this.referenceWidth;
+    const heightRatio = currentHeight / this.referenceHeight;
+
+    // Para dispositivos móviles, usar un enfoque diferente
+    const isMobile = currentWidth <= this.mobileBreakpoint;
     
     if (isMobile) {
-      return this.calculateMobileScaleFactor();
-    } else {
-      return this.calculateDesktopScaleFactor(baseWidth, baseHeight);
+      // En móviles, usar un escalado más conservador
+      // Usar el ratio mínimo para que quepa el contenido, pero limitarlo
+      return Math.min(Math.max(widthRatio, heightRatio), 1.2);
     }
+
+    // Utilizar el mayor de los dos ratios para que quepa en la pantalla
+    return Math.max(widthRatio, heightRatio);
   }
 
   isMobile(): boolean {
-    return window.innerWidth <= 768 || 
-           window.innerHeight <= 768 || 
-           /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    return window.innerWidth <= this.mobileBreakpoint;
   }
 
-  private calculateMobileScaleFactor(): number {
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
-    const baseMobileWidth = 768;
-    
-    let scaleFactor = Math.min(screenWidth, screenHeight) / baseMobileWidth;
-    scaleFactor = Math.max(0.3, Math.min(1.5, scaleFactor));
-    
-    return scaleFactor;
-  }
-
-  private calculateDesktopScaleFactor(baseWidth: number, baseHeight: number): number {
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
-    
-    const widthRatio = screenWidth / baseWidth;
-    const heightRatio = screenHeight / baseHeight;
-    
-    let scaleFactor = Math.min(widthRatio, heightRatio);
-    scaleFactor = Math.max(0.5, Math.min(2.0, scaleFactor));
-    
-    return scaleFactor;
-  }
-
-  calculateScaledDimensions(width: number, height: number, scaleFactor: number): { 
-    width: number; 
-    height: number; 
-    ratio: number 
+  calculateScaledDimensions(originalWidth: number, originalHeight: number, scaleFactor: number): {
+    width: number;
+    height: number;
+    ratio: number
   } {
-    const scaledWidth = Math.round(width * scaleFactor);
-    const scaledHeight = Math.round(height * scaleFactor);
-    const ratio = scaledWidth / width;
+    const scaledWidth = originalWidth * scaleFactor;
+    const scaledHeight = originalHeight * scaleFactor;
     
+    const maxWidth = window.innerWidth;
+    const maxHeight = window.innerHeight;
+
+    const widthRatio = maxWidth / scaledWidth;
+    const heightRatio = maxHeight / scaledHeight;
+    const ratio = Math.min(1, widthRatio, heightRatio);
+
     return {
-      width: scaledWidth,
-      height: scaledHeight,
+      width: scaledWidth * ratio,
+      height: scaledHeight * ratio,
       ratio: ratio
     };
   }
