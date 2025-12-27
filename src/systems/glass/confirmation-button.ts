@@ -28,53 +28,83 @@ export class ConfirmationButton {
   }
 
   create(): void {
-    this.button = document.createElement('button');
-    this.button.className = 'confirmation-button';
+    this._handleAndroidTouch();
+    this._createButton();
+    this._loadIcon();
+    this._setupEventListeners();
+    this._positionButton();
     
+    if (this.button) {
+      document.body.appendChild(this.button);
+    }
+  }
+
+  private _handleAndroidTouch(): void {
+    try {
+      if (window.AndroidBridge) {
+        window.activeConfirmationGlasses = window.activeConfirmationGlasses || 0;
+        window.activeConfirmationGlasses++;
+        this.glass.confirmationCounted = true;
+        window.AndroidBridge.setIgnoreEventsFalse();
+      }
+    } catch (e) {
+      console.error('Not in Android environment');
+      this.glass.confirmationCounted = false;
+    }
+  }
+
+  private _createButton(): void {
     const scaleFactor = this.scaleCalculator.calculateScaleFactor();
     const baseSize = 50;
     const scaledSize = baseSize * scaleFactor;
     
+    this.button = document.createElement('button');
+    this.button.className = 'glass-confirm-button';
+    
+    // Estilos base - sin glow, color morado
     Object.assign(this.button.style, {
-      position: 'fixed',
+      position: 'absolute',
+      zIndex: '10000',
       width: scaledSize + 'px',
       height: scaledSize + 'px',
       borderRadius: (scaledSize / 2) + 'px',
       border: 'none',
-      backgroundColor: '#7b76b9',
+      backgroundColor: '#7b76b9', // Color morado
       cursor: 'pointer',
-      boxShadow: '8px 8px 16px #b8bec7, -8px -8px 16px #ffffff',
-      transition: 'all 0.3s ease',
+      boxShadow: 'none', // Sin glow
+      transition: 'all 0.2s ease',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '0',
-      zIndex: '10002',
-      pointerEvents: 'auto'
+      padding: '0'
     });
 
-    this._loadButtonIcon();
-    this._setupPositioning();
-    this._setupEventListeners();
-    
-    document.body.appendChild(this.button);
-    this._enableTouchEvents();
+    // Estilos específicos para móvil
+    if (this.scaleCalculator.isMobile()) {
+      Object.assign(this.button.style, {
+        minWidth: '44px',
+        minHeight: '44px',
+        touchAction: 'manipulation',
+        webkitTapHighlightColor: 'transparent',
+        zIndex: '10001' // Mayor z-index para móvil
+      });
+    }
   }
 
-  private _loadButtonIcon(): void {
+  private _loadIcon(): void {
     const self = this;
     
-    FileLoader.loadText('redcircle.svg')
+    FileLoader.loadText('xbutton.svg')
       .then(function(svgContent: string) {
-        self._processButtonSvg(svgContent);
+        self._processSvgContent(svgContent);
       })
       .catch(function(error: Error) {
-        console.error('Error loading redcircle.svg for confirmation button:', error);
+        console.error('Error loading xbutton.svg:', error);
         self._fallbackToTextButton();
       });
   }
 
-  private _processButtonSvg(svgContent: string): void {
+  private _processSvgContent(svgContent: string): void {
     try {
       const parser = new DOMParser();
       const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
@@ -82,7 +112,7 @@ export class ConfirmationButton {
 
       if (svgElement) {
         const scaleFactor = this.scaleCalculator.calculateScaleFactor();
-        const baseSvgSize = 30;
+        const baseSvgSize = 34;
         const scaledSvgSize = baseSvgSize * scaleFactor;
         
         Object.assign(svgElement.style, {
@@ -98,7 +128,7 @@ export class ConfirmationButton {
         throw new Error('No SVG element found');
       }
     } catch (e) {
-      console.error('Error parsing SVG content for confirmation button:', e);
+      console.error('Error parsing SVG content:', e);
       this._fallbackToTextButton();
     }
   }
@@ -109,78 +139,101 @@ export class ConfirmationButton {
       fontSize: '24px',
       fontWeight: 'bold'
     });
-    this.button!.textContent = '✓';
+    this.button!.textContent = '✕';
   }
 
-  private _setupPositioning(): void {
-    const scaleFactor = this.scaleCalculator.calculateScaleFactor();
-    const buttonSize = 50 * scaleFactor;
+  private _positionButton(): void {
+    const self = this;
     
-    const positionContent = () => {
-      const pos = this.positionManager.getPositionStrings(this.position);
-      
-      let left = '50%';
-      let top = '50%';
-      let transform = 'translate(-50%, -50%)';
-      
-      switch (pos.hOrigin) {
-        case 'left':
-          left = (buttonSize / 2 + 20) + 'px';
-          transform = 'translateY(-50%)';
-          break;
-        case 'right':
-          left = `calc(100% - ${buttonSize / 2 + 20}px)`;
-          transform = 'translateY(-50%)';
-          break;
+    const positionButton = () => {
+      const glassContent = this.glass.img.querySelector('.glass-content');
+      if (!glassContent) {
+        requestAnimationFrame(positionButton);
+        return;
       }
+
+      const scaleFactor = this.scaleCalculator.calculateScaleFactor();
+      const buttonSize = 50 * scaleFactor;
       
-      switch (pos.vOrigin) {
-        case 'top':
-          top = (buttonSize / 2 + 20) + 'px';
-          if (pos.hOrigin === 'center') {
-            transform = 'translateX(-50%)';
-          } else {
-            transform = 'none';
-          }
-          break;
-        case 'bottom':
-          top = `calc(100% - ${buttonSize / 2 + 20}px)`;
-          if (pos.hOrigin === 'center') {
-            transform = 'translateX(-50%)';
-          } else {
-            transform = 'none';
-          }
-          break;
+      const buttonStyles = this.positionManager.calculateButtonPosition(
+        glassContent as HTMLElement,
+        this.position,
+        buttonSize,
+        scaleFactor
+      );
+
+      if (!buttonStyles) {
+        requestAnimationFrame(positionButton);
+        return;
       }
-      
-      Object.assign(this.button!.style, {
-        left: left,
-        top: top,
-        transform: transform
-      });
+
+      // Aplicar estilos de posicionamiento
+      Object.assign(this.button!.style, buttonStyles);
     };
 
-    positionContent();
-    window.addEventListener('resize', positionContent);
+    requestAnimationFrame(positionButton);
   }
 
   private _setupEventListeners(): void {
-    this.button!.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      this._handleConfirmation();
+    const self = this;
+
+    // Hover effects para desktop
+    this.button!.addEventListener('mouseover', function() {
+      self._handleMouseOver();
     });
 
-    this.button!.addEventListener('mouseover', () => {
-      this._handleMouseOver();
+    this.button!.addEventListener('mouseout', function() {
+      self._handleMouseOut();
     });
 
-    this.button!.addEventListener('mouseout', () => {
-      this._handleMouseOut();
+    // Click handler
+    this.button!.addEventListener('click', function() {
+      self._handleClick();
     });
   }
 
-  private _handleConfirmation(): void {
+  private _handleMouseOver(): void {
+    try {
+      if (window.electronAPI) {
+        window.electronAPI.send('set-ignore-events-false');
+      }
+    } catch (e) {
+      console.error('Not in Electron environment');
+    }
+
+    // Efecto hover simple - solo escala
+    const currentTransform = this.button!.style.transform;
+    this.button!.style.transform = currentTransform.indexOf('translateX') !== -1
+      ? 'translateX(-50%) scale(1.1)'
+      : 'scale(1.1)';
+    this.button!.style.backgroundColor = '#6a659f'; // Morado más oscuro en hover
+    this.button!.style.boxShadow = 'none'; // Sin glow
+  }
+
+  private _handleMouseOut(): void {
+    try {
+      if (window.electronAPI) {
+        window.electronAPI.send('set-ignore-events-true');
+      }
+    } catch (e) {
+      console.error('Not in Electron environment');
+    }
+
+    // Remover efectos hover
+    const currentTransform = this.button!.style.transform;
+    this.button!.style.transform = currentTransform.indexOf('translateX') !== -1
+      ? 'translateX(-50%)'
+      : 'none';
+    this.button!.style.backgroundColor = '#7b76b9'; // Volver al morado original
+    this.button!.style.boxShadow = 'none'; // Sin glow
+  }
+
+  private _handleClick(): void {
+    // Deshabilitar botón inmediatamente
+    this.button!.disabled = true;
+    this.button!.style.opacity = '0.5';
+    this.button!.style.cursor = 'default';
+    
     this._sendConfirmationResponse();
     this.glass.finishGlass();
   }
@@ -198,52 +251,6 @@ export class ConfirmationButton {
         }
       };
       ws.send(JSON.stringify(out));
-    }
-  }
-
-  private _handleMouseOver(): void {
-    if (this.button) {
-      this.button.style.backgroundColor = '#6a659f';
-      this.button.style.boxShadow = '4px 4px 8px #b8bec7, -4px -4px 8px #ffffff';
-      this.button.style.transform = this.button.style.transform.replace('scale(1)', 'scale(1.1)');
-    }
-    
-    try {
-      if (window.electronAPI && !window.AndroidBridge) {
-        window.electronAPI.send('set-ignore-events-false');
-      }
-    } catch (e) {
-      console.error('Not in Electron environment');
-    }
-  }
-
-  private _handleMouseOut(): void {
-    if (this.button) {
-      this.button.style.backgroundColor = '#7b76b9';
-      this.button.style.boxShadow = '8px 8px 16px #b8bec7, -8px -8px 16px #ffffff';
-      this.button.style.transform = this.button.style.transform.replace('scale(1.1)', 'scale(1)');
-    }
-    
-    try {
-      if (window.electronAPI && !window.AndroidBridge) {
-        window.electronAPI.send('set-ignore-events-true');
-      }
-    } catch (e) {
-      console.error('Not in Electron environment');
-    }
-  }
-
-  private _enableTouchEvents(): void {
-    try {
-      if (window.AndroidBridge) {
-        window.activeConfirmationGlasses = window.activeConfirmationGlasses || 0;
-        window.activeConfirmationGlasses++;
-        window.AndroidBridge.setIgnoreEventsFalse();
-      } else if (window.electronAPI) {
-        window.electronAPI.send('set-ignore-events-false');
-      }
-    } catch (e) {
-      console.error('Error enabling touch events:', e);
     }
   }
 
