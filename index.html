@@ -2,7 +2,31 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' ws://127.0.0.1:3008 ws://127.0.0.1:4000 http://127.0.0.1:4000 wss://glassnotews.intermark.ec wss://glassnotereg.intermark.ec https://glassnoteapi.intermark.ec ws://192.168.115.42:4000 http://192.168.115.42:4000 ws://192.168.100.23:4000 http://192.168.100.23:4000 http://8.8.8.8 http://1.1.1.1 https://one.one.one.one; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http://127.0.0.1:4000 http://192.168.115.42:4000 http://192.168.100.23:4000 https://glassnoteapi.intermark.ec;">
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      connect-src 'self'
+        ws://127.0.0.1:3008
+        ws://127.0.0.1:4000
+        http://127.0.0.1:4000
+        wss://glassnotews.intermark.ec
+        wss://glassnotewsdev.intermark.ec
+        wss://glassnotereg.intermark.ec
+        https://glassnoteapi.intermark.ec
+        ws://192.168.115.42:4000
+        http://192.168.115.42:4000
+        ws://192.168.100.23:4000
+        http://192.168.100.23:4000
+        http://8.8.8.8
+        http://1.1.1.1
+        https://one.one.one.one;
+      script-src 'self' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data:
+        http://127.0.0.1:4000
+        http://192.168.115.42:4000
+        http://192.168.100.23:4000
+        https://glassnoteapi.intermark.ec;
+    ">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Glassnote</title>
   </head>

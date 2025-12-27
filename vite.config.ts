@@ -10,9 +10,6 @@ export default defineConfig({
       output: {
         manualChunks: undefined
       }
-    },
-    watch: {
-      include: ['src/**']
     }
   },
   publicDir: 'public',
