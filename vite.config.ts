@@ -13,5 +13,11 @@ export default defineConfig({
     }
   },
   publicDir: 'public',
-  base: './' // Use relative paths for Electron
+  base: './', // Use relative paths for Electron
+  server: {
+    port: 5173,
+    host: true,
+    open: false, // Don't open browser automatically
+    hmr: true
+  }
 })
