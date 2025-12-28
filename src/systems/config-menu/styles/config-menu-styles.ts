@@ -54,8 +54,14 @@ export const configMenuStyles = `
   cursor: pointer;
   box-shadow: none;
   transition: all 0.2s ease;
-  font-size: 20px;
-  color: white;
+  padding: 0;
+}
+
+.close-button-icon {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) invert(1); /* Hace el SVG blanco */
+  pointer-events: none; /* Para que no interfiera con los clicks del botón */
 }
 
 .close-button:hover {

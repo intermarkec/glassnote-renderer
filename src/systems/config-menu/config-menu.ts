@@ -126,7 +126,9 @@ export class ConfigMenu {
       <div class="config-menu-container">
         <div class="config-menu-header">
           <h2 class="config-menu-title">Configuración</h2>
-          <button class="close-button" data-action="close">✕</button>
+          <button class="close-button" data-action="close">
+            <img src="./xbutton.svg" alt="X" class="close-button-icon">
+          </button>
         </div>
         
         <div class="config-menu-content">
