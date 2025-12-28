@@ -99,7 +99,7 @@ export class ConfirmationButton {
   private _loadIcon(): void {
     const self = this;
     
-    FileLoader.loadText('xbutton.svg')
+    FileLoader.loadText('/xbutton.svg')
       .then(function(svgContent: string) {
         self._processSvgContent(svgContent);
       })

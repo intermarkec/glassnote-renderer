@@ -370,30 +370,34 @@ export class ConfigMenu {
               console.log('ConfigMenu: All responses received, displaying accumulated transactions');
               this.displayAccumulatedTransactions();
             }
-          } else {
-            // For non-review messages, just log - the WebSocket manager will handle them
-            console.log('ConfigMenu: Ignoring non-review message:', message.event);
+            
+            // Return after processing review message
+            return;
           }
         } catch (error) {
           console.error('ConfigMenu: Error processing message:', error);
         }
+        
+        // For non-review messages or parsing errors, pass them to the original handler
+        // If no original handler, the message will be lost but that's okay because
+        // the WebSocket manager should have already handled it
+        if (window._originalHandleWebSocketMessage) {
+          window._originalHandleWebSocketMessage(url, event);
+        }
       };
       
-      // Reconfigure existing WebSocket connections to use the global handler
-      this.reconfigureExistingWebSockets();
+      // Restore original WebSocket handlers for existing connections
+      this.restoreOriginalWebSocketHandlers();
     }
     
-    private reconfigureExistingWebSockets(): void {
+    private restoreOriginalWebSocketHandlers(): void {
       if (window.activeConnections && window.activeConnections.size > 0) {
-        console.log('ConfigMenu: Reconfiguring existing WebSocket connections to use global handler');
+        console.log('ConfigMenu: Restoring original WebSocket handlers for existing connections');
         window.activeConnections.forEach((ws, url) => {
           if (ws.readyState === WebSocket.OPEN) {
-            console.log('ConfigMenu: Reconfiguring WebSocket for URL:', url);
-            ws.onmessage = (event: MessageEvent) => {
-              if (window._handleWebSocketMessage) {
-                window._handleWebSocketMessage(url, event);
-              }
-            };
+            console.log('ConfigMenu: Restoring WebSocket handler for URL:', url);
+            // The WebSocket manager will set up its own handler when creating connections
+            // We don't need to do anything here because we're not reconfiguring handlers
           }
         });
       }
