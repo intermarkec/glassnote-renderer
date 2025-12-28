@@ -18,22 +18,7 @@ import { initializeElectronBridge } from './systems/electron-bridge'
 const keycodeText = ref('')
 const keycodeStyle = computed(() => {
   return {
-    opacity: '0.8',
-    position: 'absolute',
-    color: '#000',
-    textShadow: '-1px -1px 0 rgb(136, 136, 136), 1px -1px 0 rgb(138, 138, 138), -1px 1px 0 rgb(255, 255, 255), 1px 1px 0 rgb(145, 145, 145)',
-    transition: 'all 0.3s ease',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    maxWidth: '90vw',
-    zIndex: '10001',
-    padding: '10px 20px',
-    borderRadius: '10px',
-    left: '5vw',
-    bottom: '15vh',
-    fontSize: '8vh',
-    maxFontSize: '30pt'
+    opacity: '0.8'
   }
 })
 
@@ -93,6 +78,58 @@ body {
   overflow: hidden;
 }
 
+/* Keycode display styles - copied from previous version */
+#keycode {
+  opacity: 0.8;
+  position: absolute;
+  color: #000;
+  text-shadow: -1px -1px 0 rgb(136, 136, 136),
+    1px -1px 0 rgb(138, 138, 138), -1px 1px 0 rgb(255, 255, 255),
+    1px 1px 0 rgb(145, 145, 145);
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90vw;
+  z-index: 10001;
+  padding: 10px 20px;
+  border-radius: 10px;
+  /* Default position for landscape */
+  left: 5vw;
+  bottom: 15vh;
+  font-size: 8vh;
+  max-font-size: 30pt;
+}
+
+/* Vertical orientation (portrait) */
+@media (orientation: portrait) {
+  #keycode {
+    left: 50%;
+    bottom: 20vh;
+    transform: translateX(-50%);
+    font-size: 6vh;
+    max-font-size: 30pt;
+    text-align: center;
+  }
+}
+
+/* Larger screens */
+@media (min-width: 1200px) and (min-height: 800px) {
+  #keycode {
+    font-size: 10vh;
+    max-font-size: 30pt;
+  }
+}
+
+/* Very small screens */
+@media (max-height: 500px) {
+  #keycode {
+    font-size: 3vh;
+    bottom: 3vh;
+    max-font-size: 30pt;
+  }
+}
+
 /* Sistema de estilos neomórficos */
 .neumorphic-container {
   background: #e0e5ec;
@@ -143,33 +180,5 @@ body {
 .neumorphic-table-cell {
   background: #e0e5ec;
   box-shadow: inset 2px 2px 4px #b8bec7, inset -2px -2px 4px #ffffff;
-}
-
-/* Vertical orientation (portrait) */
-@media (orientation: portrait) {
-  #keycode {
-    left: 50%;
-    bottom: 20vh;
-    transform: translateX(-50%);
-    font-size: 6vh;
-    max-font-size: 30pt;
-    text-align: center;
-  }
-}
-
-/* Larger screens */
-@media (min-width: 1200px) and (min-height: 800px) {
-  #keycode {
-    font-size: 10vh;
-    max-font-size: 30pt;
-  }
-}
-
-/* Very small screens */
-@media (max-height: 500px) {
-  #keycode {
-    font-size: 3vh;
-    bottom: 3vh;
-  }
 }
 </style>
