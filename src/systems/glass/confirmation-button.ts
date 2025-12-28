@@ -1,6 +1,5 @@
 import { ScaleCalculator } from './scale-calculator';
 import { PositionManager, Position } from './position-manager';
-import { FileLoader } from './file-loader';
 
 interface GlassInstance {
   finishGlass: () => void;
@@ -18,6 +17,8 @@ export class ConfirmationButton {
   private positionManager: PositionManager;
   private button: HTMLButtonElement | null = null;
   private buttonHandler: any = null;
+  private isDestroyed: boolean = false;
+  private animationFrameId: number | null = null;
 
   constructor(glassInstance: GlassInstance, position: Position) {
     this.glass = glassInstance;
@@ -97,54 +98,53 @@ export class ConfirmationButton {
   }
 
   private _loadIcon(): void {
-    const self = this;
+    if (this.isDestroyed || !this.button) {
+      return;
+    }
     
-    FileLoader.loadText('../xbutton.svg')
-      .then(function(svgContent: string) {
-        self._processSvgContent(svgContent);
-      })
-      .catch(function(error: Error) {
-        console.error('Error loading xbutton.svg:', error);
-        self._fallbackToTextButton();
-      });
-  }
-
-  private _processSvgContent(svgContent: string): void {
     try {
-      if (!this.button) {
-        console.error('Button is null in _processSvgContent');
+      const scaleFactor = this.scaleCalculator.calculateScaleFactor();
+      const baseSvgSize = 34;
+      const scaledSvgSize = baseSvgSize * scaleFactor;
+      
+      // Crear elemento img para cargar el SVG
+      const img = document.createElement('img');
+      img.src = './xbutton.svg'; // Ruta relativa desde la página actual
+      img.alt = 'X';
+      
+      Object.assign(img.style, {
+        width: scaledSvgSize + 'px',
+        height: scaledSvgSize + 'px',
+        display: 'block',
+        pointerEvents: 'none', // Para que no interfiera con los clicks del botón
+        filter: 'brightness(0) invert(1)' // Hace el SVG blanco (invierte colores y ajusta brillo)
+      });
+      
+      this.button.innerHTML = '';
+      this.button.appendChild(img);
+      
+      // Manejar error de carga
+      img.onerror = () => {
+        if (this.isDestroyed) {
+          return;
+        }
+        console.error('Failed to load xbutton.svg');
         this._fallbackToTextButton();
+      };
+    } catch (error) {
+      if (this.isDestroyed) {
         return;
       }
-      
-      const parser = new DOMParser();
-      const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
-      const svgElement = svgDoc.querySelector('svg');
-
-      if (svgElement) {
-        const scaleFactor = this.scaleCalculator.calculateScaleFactor();
-        const baseSvgSize = 34;
-        const scaledSvgSize = baseSvgSize * scaleFactor;
-        
-        Object.assign(svgElement.style, {
-          width: scaledSvgSize + 'px',
-          height: scaledSvgSize + 'px',
-          fill: 'white',
-          display: 'block'
-        });
-        
-        this.button.innerHTML = '';
-        this.button.appendChild(svgElement);
-      } else {
-        throw new Error('No SVG element found');
-      }
-    } catch (e) {
-      console.error('Error parsing SVG content:', e);
+      console.error('Error creating SVG image:', error);
       this._fallbackToTextButton();
     }
   }
 
   private _fallbackToTextButton(): void {
+    if (this.isDestroyed) {
+      return;
+    }
+    
     if (!this.button) {
       console.error('Button is null in _fallbackToTextButton');
       return;
@@ -161,6 +161,10 @@ export class ConfirmationButton {
     const self = this;
     
     const positionButton = () => {
+      if (this.isDestroyed) {
+        return;
+      }
+      
       if (!this.button) {
         console.error('Button is null in _positionButton');
         return;
@@ -168,7 +172,7 @@ export class ConfirmationButton {
       
       const glassContent = this.glass.img.querySelector('.glass-content');
       if (!glassContent) {
-        requestAnimationFrame(positionButton);
+        this.animationFrameId = requestAnimationFrame(positionButton);
         return;
       }
 
@@ -183,15 +187,16 @@ export class ConfirmationButton {
       );
 
       if (!buttonStyles) {
-        requestAnimationFrame(positionButton);
+        this.animationFrameId = requestAnimationFrame(positionButton);
         return;
       }
 
       // Aplicar estilos de posicionamiento
       Object.assign(this.button.style, buttonStyles);
+      this.animationFrameId = null;
     };
 
-    requestAnimationFrame(positionButton);
+    this.animationFrameId = requestAnimationFrame(positionButton);
   }
 
   private _setupEventListeners(): void {
@@ -218,6 +223,10 @@ export class ConfirmationButton {
   }
 
   private _handleMouseOver(): void {
+    if (this.isDestroyed) {
+      return;
+    }
+    
     if (!this.button) {
       console.error('Button is null in _handleMouseOver');
       return;
@@ -245,6 +254,10 @@ export class ConfirmationButton {
   }
 
   private _handleMouseOut(): void {
+    if (this.isDestroyed) {
+      return;
+    }
+    
     if (!this.button) {
       console.error('Button is null in _handleMouseOut');
       return;
@@ -272,6 +285,10 @@ export class ConfirmationButton {
   }
 
   private _handleClick(): void {
+    if (this.isDestroyed) {
+      return;
+    }
+    
     if (!this.button) {
       console.error('Button is null in _handleClick');
       return;
@@ -287,6 +304,10 @@ export class ConfirmationButton {
   }
 
   private _sendConfirmationResponse(): void {
+    if (this.isDestroyed) {
+      return;
+    }
+    
     const ws = this.glass.activeConnections.get(this.glass.url);
     if (ws && ws.readyState === WebSocket.OPEN) {
       const glassId = (this.glass.img as any).glass_id;
@@ -303,6 +324,13 @@ export class ConfirmationButton {
   }
 
   cleanup(): void {
+    this.isDestroyed = true;
+    
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+    
     if (this.button && this.button.parentNode) {
       document.body.removeChild(this.button);
     }

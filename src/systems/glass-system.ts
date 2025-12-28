@@ -367,10 +367,12 @@ window.isDuplicateMessage = function(messageId: string, _position: string): bool
   )
 }
 
-// Window visibility checking
-window.checkWindowVisibility = function(): void {
-  // Simple implementation - in Electron this would show/hide the window
-  console.log('Window visibility check')
+// Window visibility checking - only define if not already defined
+if (!window.checkWindowVisibility) {
+  window.checkWindowVisibility = function(): void {
+    // Simple implementation - in Electron this would show/hide the window
+    console.log('Window visibility check')
+  }
 }
 
 // Export for use in other modules
