@@ -77,9 +77,49 @@ export interface TokenData {
   refreshTokenHash?: string
 }
 
+// Platform detection
+export type PlatformContext = 'android' | 'electron' | 'browser';
+
+export function getPlatformContext(): PlatformContext {
+  if (typeof window.AndroidBridge !== 'undefined') {
+    return 'android';
+  } else if (window.electronAPI && typeof window.electronAPI.receive === 'function') {
+    return 'electron';
+  } else {
+    return 'browser';
+  }
+}
+
+// Make platform context available globally
+window.getPlatformContext = getPlatformContext;
+
+// Helper function to check if running in browser mode
+export function isBrowserMode(): boolean {
+  return getPlatformContext() === 'browser';
+}
+
+// Helper function to check if running in electron mode
+export function isElectronMode(): boolean {
+  return getPlatformContext() === 'electron';
+}
+
+// Helper function to check if running in android mode
+export function isAndroidMode(): boolean {
+  return getPlatformContext() === 'android';
+}
+
+// Make helper functions globally available
+window.isBrowserMode = isBrowserMode;
+window.isElectronMode = isElectronMode;
+window.isAndroidMode = isAndroidMode;
+
 // Make global functions available
 declare global {
   interface Window {
     getURLParameter: (name: string) => string | null
+    getPlatformContext: () => PlatformContext
+    isBrowserMode: () => boolean
+    isElectronMode: () => boolean
+    isAndroidMode: () => boolean
   }
 }

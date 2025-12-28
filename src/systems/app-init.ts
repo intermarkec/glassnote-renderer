@@ -18,7 +18,21 @@ if (window.electronAPI) {
     // DO NOT connect automatically - let user-data-manager handle the connections
   })
 } else {
-  window.appVersion = 'MOVIL'
+  // Use centralized platform detection to determine correct version
+  // Check if platform detection functions are available
+  if (window.getPlatformContext) {
+    const platform = window.getPlatformContext();
+    if (platform === 'android') {
+      window.appVersion = 'MOVIL';
+    } else if (platform === 'browser') {
+      window.appVersion = 'BROWSER';
+    } else {
+      window.appVersion = 'MOVIL'; // Fallback
+    }
+  } else {
+    // Fallback to old logic
+    window.appVersion = 'MOVIL'
+  }
   
   // Load servers using centralized user data manager
   if (window.userDataManager) {

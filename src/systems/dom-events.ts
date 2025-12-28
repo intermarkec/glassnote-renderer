@@ -380,6 +380,36 @@ document.addEventListener('DOMContentLoaded', function() {
   if (typeof window.initializeElectronHandlers === 'function') {
     window.initializeElectronHandlers()
   }
+
+  // Add Tab key handler for browser mode (not Electron, not Android)
+  // In browser mode, Tab key should open the config menu when it's closed
+  // Use centralized platform detection
+  const isBrowserMode = window.isBrowserMode ? window.isBrowserMode() : (!window.electronAPI && !window.AndroidBridge);
+  if (isBrowserMode) {
+    document.addEventListener('keydown', function(event) {
+      // Check if Tab key is pressed (keyCode 9 or key 'Tab')
+      if (event.key === 'Tab' || event.keyCode === 9) {
+        const isConfigMenuVisible = window._configMenuInstance && window._configMenuInstance.isVisible;
+        
+        // Only handle Tab to open menu when config menu is NOT visible
+        if (!isConfigMenuVisible) {
+          // Prevent default Tab behavior (focus navigation) when opening menu
+          event.preventDefault();
+          
+          // Open config menu using toggleConfigMenu if available
+          if (typeof window.toggleConfigMenu === 'function') {
+            window.toggleConfigMenu();
+          } else if (window._configMenuInstance) {
+            window._configMenuInstance.show();
+          } else if (typeof window.showConfigMenu === 'function') {
+            // showConfigMenu expects a view parameter, pass empty string
+            window.showConfigMenu('');
+          }
+        }
+        // If config menu is already visible, let Tab work normally for navigation within the menu
+      }
+    });
+  }
 })
 
 // Global function to show config menu
