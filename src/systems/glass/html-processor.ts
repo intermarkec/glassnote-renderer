@@ -247,7 +247,12 @@ export class HTMLProcessor {
       if (window.AndroidBridge) {
         window.activeConfirmationGlasses = window.activeConfirmationGlasses || 0;
         window.activeConfirmationGlasses++;
-        window.AndroidBridge.setIgnoreEventsFalse();
+        // Use centralized passthrough manager if available
+        if (window.passthroughManager) {
+          window.passthroughManager.setPassthrough(false);
+        } else {
+          window.AndroidBridge.setIgnoreEventsFalse();
+        }
       } else if (window.electronAPI) {
         this._setupFormMouseEvents(glassContent);
       }
@@ -266,7 +271,11 @@ export class HTMLProcessor {
     
     iframe.addEventListener('mouseenter', function() {
       try {
-        if (window.electronAPI) {
+        // Use centralized passthrough manager if available
+        if (window.passthroughManager) {
+          window.passthroughManager.setPassthrough(false);
+        } else if (window.electronAPI) {
+          // Fallback to direct electron API
           window.electronAPI.send('set-ignore-events-false');
         }
       } catch (e) {
@@ -276,7 +285,11 @@ export class HTMLProcessor {
     
     iframe.addEventListener('mouseleave', function() {
       try {
-        if (window.electronAPI) {
+        // Use centralized passthrough manager if available
+        if (window.passthroughManager) {
+          window.passthroughManager.setPassthrough(true);
+        } else if (window.electronAPI) {
+          // Fallback to direct electron API
           window.electronAPI.send('set-ignore-events-true');
         }
       } catch (e) {
@@ -286,7 +299,11 @@ export class HTMLProcessor {
     
     glassContent.addEventListener('mouseenter', function() {
       try {
-        if (window.electronAPI) {
+        // Use centralized passthrough manager if available
+        if (window.passthroughManager) {
+          window.passthroughManager.setPassthrough(false);
+        } else if (window.electronAPI) {
+          // Fallback to direct electron API
           window.electronAPI.send('set-ignore-events-false');
         }
       } catch (e) {
@@ -296,7 +313,11 @@ export class HTMLProcessor {
     
     glassContent.addEventListener('mouseleave', function() {
       try {
-        if (window.electronAPI) {
+        // Use centralized passthrough manager if available
+        if (window.passthroughManager) {
+          window.passthroughManager.setPassthrough(true);
+        } else if (window.electronAPI) {
+          // Fallback to direct electron API
           window.electronAPI.send('set-ignore-events-true');
         }
       } catch (e) {
@@ -305,7 +326,11 @@ export class HTMLProcessor {
     });
     
     try {
-      if (window.electronAPI) {
+      // Use centralized passthrough manager if available
+      if (window.passthroughManager) {
+        window.passthroughManager.setPassthrough(false);
+      } else if (window.electronAPI) {
+        // Fallback to direct electron API
         window.electronAPI.send('set-ignore-events-false');
       }
     } catch (e) {

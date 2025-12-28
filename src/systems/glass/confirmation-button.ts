@@ -45,7 +45,12 @@ export class ConfirmationButton {
         window.activeConfirmationGlasses = window.activeConfirmationGlasses || 0;
         window.activeConfirmationGlasses++;
         this.glass.confirmationCounted = true;
-        window.AndroidBridge.setIgnoreEventsFalse();
+        // Use centralized passthrough manager if available
+        if (window.passthroughManager) {
+          window.passthroughManager.setPassthrough(false);
+        } else {
+          window.AndroidBridge.setIgnoreEventsFalse();
+        }
       }
     } catch (e) {
       console.error('Not in Android environment');
@@ -194,7 +199,11 @@ export class ConfirmationButton {
 
   private _handleMouseOver(): void {
     try {
-      if (window.electronAPI) {
+      // Use centralized passthrough manager if available
+      if (window.passthroughManager) {
+        window.passthroughManager.setPassthrough(false);
+      } else if (window.electronAPI) {
+        // Fallback to direct electron API
         window.electronAPI.send('set-ignore-events-false');
       }
     } catch (e) {
@@ -212,7 +221,11 @@ export class ConfirmationButton {
 
   private _handleMouseOut(): void {
     try {
-      if (window.electronAPI) {
+      // Use centralized passthrough manager if available
+      if (window.passthroughManager) {
+        window.passthroughManager.setPassthrough(true);
+      } else if (window.electronAPI) {
+        // Fallback to direct electron API
         window.electronAPI.send('set-ignore-events-true');
       }
     } catch (e) {
@@ -275,11 +288,21 @@ export class ConfirmationButton {
           }
           this.glass.confirmationCounted = true;
           if (window.activeConfirmationGlasses === 0) {
-            window.AndroidBridge.setIgnoreEventsTrue();
+            // Use centralized passthrough manager if available
+            if (window.passthroughManager) {
+              window.passthroughManager.setPassthrough(true);
+            } else {
+              window.AndroidBridge.setIgnoreEventsTrue();
+            }
           }
         }
       } else if (window.electronAPI) {
-        window.electronAPI.send('set-ignore-events-true');
+        // Use centralized passthrough manager if available
+        if (window.passthroughManager) {
+          window.passthroughManager.setPassthrough(true);
+        } else {
+          window.electronAPI.send('set-ignore-events-true');
+        }
       }
     } catch (e) {
       console.error('Error disabling touch events:', e);

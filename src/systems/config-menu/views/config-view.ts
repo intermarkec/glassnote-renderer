@@ -14,7 +14,7 @@ export interface ConfigData {
 
 export class ConfigView {
   private container: HTMLElement;
-  private configData: ConfigData = {};
+  private _configData: ConfigData = {};
   private onChangeCallback?: (key: string, value: any) => void;
 
   constructor(container: HTMLElement) {
@@ -22,7 +22,7 @@ export class ConfigView {
   }
 
   setConfigData(configData: ConfigData): void {
-    this.configData = { ...configData };
+    this._configData = { ...configData };
     this.render();
   }
 

@@ -22,10 +22,16 @@ import './systems/glass/svg-processor'
 import './systems/glass/image-processor'
 import './systems/glass/confirmation-button'
 
+// Import registration system
+import { setupRegistrationSystem } from './systems/registration-system'
+
 // Import dom-events last to ensure all dependencies are loaded
 import './systems/dom-events'
 
 console.log('Glass system modules loaded and available globally')
+
+// Setup registration system
+setupRegistrationSystem()
 
 const app = createApp(App)
 

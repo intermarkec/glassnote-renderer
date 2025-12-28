@@ -402,7 +402,7 @@ export const configMenuStyles = `
   border-radius: 12px;
   overflow: hidden;
   background-color: #e0e5ec;
-  box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
+  box-shadow: 4px 4px 8px #b8bec7, -4px -4px 8px #ffffff;
 }
 
 .transactions-table th {
@@ -412,14 +412,14 @@ export const configMenuStyles = `
   background-color: #e0e5ec;
   font-weight: 600;
   color: #5a6c8d;
-  box-shadow: inset 1px 1px 2px #b8bec7, inset -1px -1px 2px #ffffff;
+  box-shadow: inset 2px 2px 4px #b8bec7, inset -2px -2px 4px #ffffff;
 }
 
 .transactions-table td {
   padding: 12px 10px;
   background-color: #e0e5ec;
   border-radius: 10px;
-  box-shadow: 1px 1px 3px #b8bec7, -1px -1px 3px #ffffff;
+  box-shadow: 2px 2px 6px #b8bec7, -2px -2px 6px #ffffff;
 }
 
 .date-cell {
@@ -450,7 +450,7 @@ export const configMenuStyles = `
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   transition: all 0.2s ease;
 }
 

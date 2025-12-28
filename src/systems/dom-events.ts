@@ -49,8 +49,11 @@ function addToUnifiedQueue(url: string | null, message: any): void {
     window.is_user_present = false
 
     try {
-      if (window.AndroidBridge) {
-        //SE ACTIVA EL TOUCH CUANDO SE REQUIERE CONFIRMAR PRESENCIA
+      // Use centralized passthrough manager if available
+      if (window.passthroughManager) {
+        window.passthroughManager.setPassthrough(false);
+      } else if (window.AndroidBridge) {
+        // Fallback to direct AndroidBridge
         window.AndroidBridge.setIgnoreEventsFalse()
       }
     } catch (e) {
@@ -213,9 +216,15 @@ document.addEventListener('DOMContentLoaded', function() {
   const detectPresenceHandler = function() {
     window.is_user_present = true
     const configMenuVisible = window._configMenuInstance && window._configMenuInstance.isVisible
-    if (window.AndroidBridge && window.activeConfirmationGlasses === 0 && !configMenuVisible) {
+    if (window.activeConfirmationGlasses === 0 && !configMenuVisible) {
       //SE QUITA TOUCH CUANDO NO HAY GLASSES QUE REQUIERAN CONFIRMACION
-      window.AndroidBridge.setIgnoreEventsTrue()
+      // Use centralized passthrough manager if available
+      if (window.passthroughManager) {
+        window.passthroughManager.setPassthrough(true);
+      } else if (window.AndroidBridge) {
+        // Fallback to direct AndroidBridge
+        window.AndroidBridge.setIgnoreEventsTrue()
+      }
     }
     // Process queue when user becomes present
     processUnifiedQueue()
@@ -306,7 +315,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Toggle clickthrough on mouseover/out
     testButton.addEventListener('mouseover', function() {
       try {
-        if (window.electronAPI) {
+        // Use centralized passthrough manager if available
+        if (window.passthroughManager) {
+          window.passthroughManager.setPassthrough(false);
+        } else if (window.electronAPI) {
+          // Fallback to direct electron API
           window.electronAPI.send('set-ignore-events-false')
         }
       } catch (e) {
@@ -316,7 +329,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     testButton.addEventListener('mouseout', function() {
       try {
-        if (window.electronAPI) {
+        // Use centralized passthrough manager if available
+        if (window.passthroughManager) {
+          window.passthroughManager.setPassthrough(true);
+        } else if (window.electronAPI) {
+          // Fallback to direct electron API
           window.electronAPI.send('set-ignore-events-true')
         }
       } catch (e) {

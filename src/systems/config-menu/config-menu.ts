@@ -3,6 +3,7 @@ import { ReviewView } from './views/review-view';
 import { ConfigView, ConfigData } from './views/config-view';
 import { configMenuStyles } from './styles/config-menu-styles';
 import { Transaction, PendingRequest, ReviewTransaction } from './types';
+import { PassthroughManager } from './passthrough-manager';
 
 // Global function to toggle config menu (similar to original implementation)
 export function toggleConfigMenu(view?: string): void {
@@ -28,12 +29,13 @@ export function toggleConfigMenu(view?: string): void {
 export class ConfigMenu {
   private container: HTMLElement;
   public isVisible: boolean = false;
-  private currentView: string = 'review';
+  public currentView: string = 'review';
   private reviewView: ReviewView;
   private configView: ConfigView;
   private transactions: Transaction[] = [];
   private pendingRequests: PendingRequest[] = [];
   private configData: ConfigData = {};
+  private passthroughManager: PassthroughManager;
   
   // Review system properties
   private pendingRequestsMap: Map<string, {serverUrl: string, timestamp: number, requestId: string}> = new Map();
@@ -48,6 +50,7 @@ export class ConfigMenu {
     
     this.reviewView = new ReviewView(document.createElement('div'));
     this.configView = new ConfigView(document.createElement('div'));
+    this.passthroughManager = PassthroughManager.getInstance();
     
     this.setupStyles();
     this.setupEventListeners();
@@ -78,14 +81,22 @@ export class ConfigMenu {
     this.container.style.display = 'flex';
     this.isVisible = true;
     
-    // Disable mouse event passthrough when config menu is open
-    this.setIgnoreMouseEvents(false);
+    // Initialize passthrough manager with the container
+    // We need to get the actual container element (the config-menu-container div)
+    const containerElement = this.container.querySelector('.config-menu-container') as HTMLElement;
+    if (containerElement) {
+      this.passthroughManager.initialize(containerElement);
+    } else {
+      // Fallback to the main container
+      this.passthroughManager.initialize(this.container);
+    }
     
     this.initializeViews();
     this.attachEventListeners();
     await this.loadData();
     
     // Request transactions when showing the menu in review view
+    // This loads previous glasses when menu becomes visible, not when tab changes
     if (this.currentView === 'review') {
       this.requestTransactions();
     }
@@ -94,12 +105,12 @@ export class ConfigMenu {
   hide(): void {
     if (!this.isVisible) return;
     
+    // Clean up passthrough manager
+    this.passthroughManager.cleanup();
+    
     this.container.style.display = 'none';
     this.container.remove();
     this.isVisible = false;
-    
-    // Re-enable mouse event passthrough when config menu is closed
-    this.setIgnoreMouseEvents(true);
   }
 
   toggle(): void {
@@ -148,8 +159,9 @@ export class ConfigMenu {
     } else {
       this.configView = new ConfigView(viewContent);
       this.configView.setConfigData(this.configData);
-      this.configView.setOnChangeCallback((key, value) => {
-        this.configData[key as keyof ConfigData] = value;
+      this.configView.setOnChangeCallback((action, _value) => {
+        // Handle config button actions
+        this.handleAction(action);
       });
     }
   }
@@ -207,10 +219,9 @@ export class ConfigMenu {
 
     this.initializeViews();
     
-    // Request transactions when switching to review view
-    if (view === 'review' && this.isVisible) {
-      this.requestTransactions();
-    }
+    // Do NOT request transactions when switching tabs
+    // Loading should only happen when menu becomes visible, not when tab changes
+    // This prevents forcing tab changes and unnecessary reloads
   }
 
   private handleAction(action: string): void {
@@ -441,7 +452,7 @@ export class ConfigMenu {
   
     private displayAccumulatedTransactions(): void {
       const allTransactions: ReviewTransaction[] = [];
-      this.accumulatedTransactions.forEach((transactions, serverUrl) => {
+      this.accumulatedTransactions.forEach((transactions, _serverUrl) => {
         allTransactions.push(...transactions);
       });
   
@@ -470,12 +481,13 @@ export class ConfigMenu {
       console.log('ConfigMenu: Glass class available:', !!window.Glass);
       console.log('ConfigMenu: Glass class constructor:', window.Glass);
       
+      // Ensure all required fields have defaults
       const glassMessage = {
         event: 'message',
         data: {
-          id: transaction.id.toString(),
-          messageId: 'configmenu_' + transaction.id.toString(),
-          messageName: transaction.name || '',
+          id: transaction.id?.toString() || 'unknown',
+          messageId: 'configmenu_' + (transaction.id?.toString() || Date.now().toString()),
+          messageName: transaction.name || transaction.serverName || 'Unknown',
           messageType: transaction.messageType || 'image',
           status: 'SUCCESS',
           position: transaction.position || '{"h":1,"v":1}',
@@ -488,16 +500,16 @@ export class ConfigMenu {
           parameters: transaction.parameters || '[]',
           createdAt: new Date().toISOString(),
           expirationDate: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-          baseUrl: transaction.baseUrl || transaction.serverUrl.replace('ws://', 'http://').replace('/ws', '')
+          baseUrl: transaction.baseUrl || (transaction.serverUrl ? transaction.serverUrl.replace('ws://', 'http://').replace('/ws', '') : '')
         }
       };
       
       console.log('ConfigMenu: Creating Glass with message:', JSON.stringify(glassMessage, null, 2));
       
-      if (window.Glass) {
+      if (window.Glass && typeof window.Glass === 'function') {
         try {
           console.log('ConfigMenu: Glass class available, creating instance');
-          const glassInstance = new window.Glass(transaction.serverUrl, glassMessage);
+          const glassInstance = new window.Glass(transaction.serverUrl || null, glassMessage);
           console.log('ConfigMenu: Glass instance created successfully:', glassInstance);
           console.log('ConfigMenu: Glass instance properties:', Object.keys(glassInstance));
         } catch (error) {
@@ -542,23 +554,4 @@ export class ConfigMenu {
       return 'No description';
     }
 
-  private setIgnoreMouseEvents(ignore: boolean): void {
-    // For Electron
-    if (window.electronAPI) {
-      if (ignore) {
-        window.electronAPI.send('set-ignore-events-true');
-      } else {
-        window.electronAPI.send('set-ignore-events-false');
-      }
-    }
-    
-    // For Android WebView
-    if (window.AndroidBridge) {
-      if (ignore) {
-        window.AndroidBridge.setIgnoreEventsTrue();
-      } else {
-        window.AndroidBridge.setIgnoreEventsFalse();
-      }
-    }
-  }
 }

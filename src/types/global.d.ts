@@ -69,6 +69,7 @@ declare global {
       postMessage: (message: string) => void
       setIgnoreEventsTrue: () => void
       setIgnoreEventsFalse: () => void
+      openExternal?: (url: string) => void
     }
     
     // User data manager
@@ -91,6 +92,7 @@ declare global {
       handleRegistrationResponse: (serverUrl: string, refreshToken: string, refreshTokenHash?: string) => Promise<boolean>
       getConfig: () => Promise<any>
       setConfig: (config: any) => Promise<boolean>
+      generateUUID: () => string
     }
     
     // Config menu
@@ -120,10 +122,13 @@ declare global {
     // Electron handlers
     initializeElectronHandlers?: () => void
     
-    // Registration functions
+    // Registration functions and variables
+    REGISTRATION_SERVER_URL?: string
+    generateUUID?: () => string
     requestRegistrationCode?: () => void
     closeRegistrationConnection?: () => void
     handleRegisterButtonClick?: () => void
+    positionRegisterButtonBelowKeycode?: () => void
     
     // Glass system
     Glass?: any

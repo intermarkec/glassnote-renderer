@@ -54,7 +54,8 @@ export class ReviewView {
 
     const tableRows = this.transactions.map((transaction, index) => {
       const date = this.formatDate(transaction.createdAt || '');
-      const name = transaction.name || this.extractNameFromUploads(transaction.uploads || '') || 'N/A';
+      // Use serverName if available, otherwise extract from uploads
+      const name = transaction.name || transaction.serverName || this.extractNameFromUploads(transaction.uploads || '') || 'N/A';
       const description = transaction.description || this.extractDescriptionFromUploads(transaction.uploads || '') || 'N/A';
       
       return `
@@ -163,29 +164,30 @@ export class ReviewView {
     return 'No description';
   }
 
-  private getStatusClass(status: string): string {
-    switch (status) {
-      case 'completed':
-        return 'status-completed';
-      case 'failed':
-        return 'status-failed';
-      case 'pending':
-      default:
-        return 'status-pending';
-    }
-  }
+  // These methods are kept for compatibility but not currently used
+  // private getStatusClass(status: string): string {
+  //   switch (status) {
+  //     case 'completed':
+  //       return 'status-completed';
+  //     case 'failed':
+  //       return 'status-failed';
+  //     case 'pending':
+  //     default:
+  //       return 'status-pending';
+  //   }
+  // }
 
-  private getStatusText(status: string): string {
-    switch (status) {
-      case 'completed':
-        return 'Completado';
-      case 'failed':
-        return 'Fallido';
-      case 'pending':
-      default:
-        return 'Pendiente';
-    }
-  }
+  // private getStatusText(status: string): string {
+  //   switch (status) {
+  //     case 'completed':
+  //       return 'Completado';
+  //     case 'failed':
+  //       return 'Fallido';
+  //     case 'pending':
+  //     default:
+  //       return 'Pendiente';
+  //   }
+  // }
 
   showLoading(): void {
     this.container.innerHTML = `

@@ -22,9 +22,8 @@ export class MouseMoveButton {
   }
 
   private handleMouseOver(): void {
-    if (window.electronAPI && !window.AndroidBridge) {
-      window.electronAPI.send('set-ignore-events-false');
-    }
+    // NOTA: El passthrough se maneja a nivel de ventana en config-menu.ts
+    // No enviar comandos de passthrough aquí
 
     const currentTransform = this.button.style.transform;
     this.button.style.transform = currentTransform.indexOf('translateX') !== -1
@@ -39,9 +38,8 @@ export class MouseMoveButton {
   }
 
   private handleMouseOut(): void {
-    if (window.electronAPI && !window.AndroidBridge) {
-      window.electronAPI.send('set-ignore-events-true');
-    }
+    // NOTA: El passthrough se maneja a nivel de ventana en config-menu.ts
+    // No enviar comandos de passthrough aquí
 
     const currentTransform = this.button.style.transform;
     this.button.style.transform = currentTransform.indexOf('translateX') !== -1

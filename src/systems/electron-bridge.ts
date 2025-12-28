@@ -232,7 +232,11 @@ export class ElectronBridge {
    * Set ignore mouse events
    */
   public setIgnoreMouseEvents(ignore: boolean): void {
-    if (window.electronAPI) {
+    // Use centralized passthrough manager if available
+    if (window.passthroughManager) {
+      window.passthroughManager.setPassthrough(ignore);
+    } else if (window.electronAPI) {
+      // Fallback to direct electron API
       if (ignore) {
         window.electronAPI.send('set-ignore-events-true');
       } else {
