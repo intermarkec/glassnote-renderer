@@ -196,7 +196,11 @@ export class ConfigMenu {
       if (action && action !== 'close') {
         new MouseMoveButton({
           button: button as HTMLElement,
-          clickHandler: () => this.handleAction(action)
+          clickHandler: () => {
+            this.handleAction(action).catch(error => {
+              console.error('Error handling action:', action, error);
+            });
+          }
         });
       }
     });
@@ -224,7 +228,7 @@ export class ConfigMenu {
     // This prevents forcing tab changes and unnecessary reloads
   }
 
-  private handleAction(action: string): void {
+  private async handleAction(action: string): Promise<void> {
     switch (action) {
       case 'save':
         this.saveConfig();
@@ -234,7 +238,11 @@ export class ConfigMenu {
         break;
       case 'request-code':
         if (typeof window.requestRegistrationCode === 'function') {
-          window.requestRegistrationCode();
+          try {
+            await window.requestRegistrationCode();
+          } catch (error) {
+            console.error('Error requesting registration code:', error);
+          }
         }
         break;
       case 'hide-code':
@@ -244,7 +252,11 @@ export class ConfigMenu {
         break;
       case 'register':
         if (typeof window.handleRegisterButtonClick === 'function') {
-          window.handleRegisterButtonClick();
+          try {
+            await window.handleRegisterButtonClick();
+          } catch (error) {
+            console.error('Error handling register button click:', error);
+          }
         }
         // Close config menu after opening registration URL
         this.hide();

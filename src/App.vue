@@ -52,14 +52,10 @@ onMounted(() => {
     console.log('appInit not available')
   }
   
-  // Set up keycode display
-  if (window.setKeycodeText) {
-    console.log('Setting up keycode display')
-    window.setKeycodeText = (text: string) => {
-      keycodeText.value = text
-    }
-  } else {
-    console.log('setKeycodeText not available')
+  // Set up keycode display - always set the function
+  console.log('Setting up keycode display')
+  window.setKeycodeText = (text: string) => {
+    keycodeText.value = text
   }
 
   // Show splash after Vue is fully mounted and systems are initialized

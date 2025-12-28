@@ -25,7 +25,7 @@ function generateUUID(): string {
 }
 
 // Function to request registration code
-export function requestRegistrationCode(): void {
+export async function requestRegistrationCode(): Promise<void> {
   // Prevent multiple simultaneous registration attempts
   if (isRegistrationInProgress) {
     console.log('Registration already in progress');
@@ -53,45 +53,80 @@ export function requestRegistrationCode(): void {
     registrationWebSocket = null;
   }
 
-  // Create new WebSocket connection
+  // Create new WebSocket connection with Base64 protocol like original implementation
   try {
-    registrationWebSocket = new WebSocket(registrationServerUrl);
+    // Get UUID and OS info for protocol
+    let uuid = window.uuid;
+    if (!uuid && window.userDataManager) {
+      try {
+        uuid = await window.userDataManager.getUUID();
+      } catch (error) {
+        console.error('Error getting UUID from userDataManager:', error);
+        uuid = window.generateUUID ? window.generateUUID() : 'unknown-uuid';
+      }
+    } else if (!uuid) {
+      uuid = localStorage.getItem('device_uuid') || (window.generateUUID ? window.generateUUID() : 'unknown-uuid');
+    }
+    
+    let osInfo = '';
+    let localIps = '["127.0.0.1"]';
+    if (window.AndroidBridge) {
+      osInfo = 'android';
+    } else if (window.electronAPI && window.electronAPI.getOSInfo) {
+      const info = window.electronAPI.getOSInfo();
+      osInfo = info ? info.platform : navigator.platform;
+      
+      // Get network interfaces if available
+      if (info && info.networkInterfaces) {
+        const interfaces = info.networkInterfaces();
+        const ipAddresses: string[] = [];
+        for (const ifaceName in interfaces) {
+          const iface = interfaces[ifaceName];
+          for (let j = 0; j < iface.length; j++) {
+            ipAddresses.push(iface[j]);
+          }
+        }
+        localIps = JSON.stringify(ipAddresses);
+      }
+    } else {
+      osInfo = navigator.platform;
+    }
+    
+    // Create protocol data and encode in Base64 (like original implementation)
+    const protocolData = JSON.stringify({
+      uuid: uuid,
+      os: osInfo,
+      localIps: localIps
+    });
+    
+    // Encode to Base64 and replace = with - to avoid protocol format issues
+    const base64ProtocolData = btoa(protocolData).replace(/=/g, '-');
+    
+    // Create WebSocket with Base64 encoded protocol
+    registrationWebSocket = new WebSocket(registrationServerUrl, base64ProtocolData);
+    
+    // Add connection timeout check (like original implementation)
+    const connectionTimeout = setTimeout(function() {
+      if (registrationWebSocket && registrationWebSocket.readyState === WebSocket.CONNECTING) {
+        console.error('WebSocket connection timeout - still in CONNECTING state after 10 seconds');
+        registrationWebSocket.close();
+      }
+    }, 10000);
     
     registrationWebSocket.onopen = async function() {
+      // Clear connection timeout
+      clearTimeout(connectionTimeout);
+      
       console.log('Registration WebSocket connection opened');
       
-      // Get UUID
-      let uuid = window.uuid;
-      if (!uuid && window.userDataManager) {
-        try {
-          uuid = await window.userDataManager.getUUID();
-        } catch (error) {
-          console.error('Error getting UUID from userDataManager:', error);
-          uuid = window.generateUUID ? window.generateUUID() : 'unknown-uuid';
-        }
-      } else if (!uuid) {
-        uuid = localStorage.getItem('device_uuid') || (window.generateUUID ? window.generateUUID() : 'unknown-uuid');
-      }
-      
-      // Get OS info
-      let osInfo = '';
-      if (window.AndroidBridge) {
-        osInfo = 'android';
-      } else if (window.electronAPI && window.electronAPI.getOSInfo) {
-        const info = window.electronAPI.getOSInfo();
-        osInfo = info ? info.platform : navigator.platform;
-      } else {
-        osInfo = navigator.platform;
-      }
-
-      // Prepare registration request
+      // Prepare registration request (same data as before)
       const data = {
         event: 'keycode',
         data: {
           uuid: uuid,
           os: osInfo,
           nonce: Date.now(),
-          localIps: '["127.0.0.1"]',
+          localIps: localIps,
         },
       };
       
@@ -100,6 +135,12 @@ export function requestRegistrationCode(): void {
       } catch (sendError) {
         console.error('Failed to send registration request:', sendError);
       }
+    };
+    
+    registrationWebSocket.onerror = function(error: Event) {
+      // Clear connection timeout
+      clearTimeout(connectionTimeout);
+      console.error('Registration WebSocket error:', error);
     };
 
     registrationWebSocket.onerror = function(error: Event) {
@@ -112,9 +153,13 @@ export function requestRegistrationCode(): void {
       isRegistrationInProgress = false;
       
       // Clear keycode display if exists
-      const keycodeElement = document.getElementById('keycode');
-      if (keycodeElement) {
-        keycodeElement.textContent = '';
+      if (typeof window.setKeycodeText === 'function') {
+        window.setKeycodeText('');
+      } else {
+        const keycodeElement = document.getElementById('keycode');
+        if (keycodeElement) {
+          keycodeElement.textContent = '';
+        }
       }
     };
 
@@ -137,15 +182,20 @@ export function requestRegistrationCode(): void {
 async function handleRegistrationResponse(response: any): Promise<void> {
   try {
     if (response.event === 'keycode' && response.data && response.data.keycode) {
-      const keycodeElement = document.getElementById('keycode');
-      if (keycodeElement) {
-        keycodeElement.textContent = response.data.keycode;
-        console.log('Registration code received:', response.data.keycode);
-        
-        // Show window when code is displayed
-        if (typeof window.checkWindowVisibility === 'function') {
-          window.checkWindowVisibility();
+      // Use global setKeycodeText function if available, otherwise fallback to DOM manipulation
+      if (typeof window.setKeycodeText === 'function') {
+        window.setKeycodeText(response.data.keycode);
+      } else {
+        const keycodeElement = document.getElementById('keycode');
+        if (keycodeElement) {
+          keycodeElement.textContent = response.data.keycode;
         }
+      }
+      console.log('Registration code received:', response.data.keycode);
+      
+      // Show window when code is displayed
+      if (typeof window.checkWindowVisibility === 'function') {
+        window.checkWindowVisibility();
       }
     } else if (response.event === 'register' && response.data && response.data.server) {
       const serverUrl = response.data.server;
@@ -156,8 +206,8 @@ async function handleRegistrationResponse(response: any): Promise<void> {
       if (window.userDataManager && window.userDataManager.handleRegistrationResponse) {
         try {
           await window.userDataManager.handleRegistrationResponse(
-            serverUrl, 
-            refreshToken || '', 
+            serverUrl,
+            refreshToken || '',
             refreshTokenHash
           );
           console.log('Server registered successfully:', serverUrl);
@@ -167,14 +217,18 @@ async function handleRegistrationResponse(response: any): Promise<void> {
       }
 
       // Clear keycode display
-      const keycodeElement = document.getElementById('keycode');
-      if (keycodeElement) {
-        keycodeElement.textContent = '';
-        
-        // Hide window when code is cleared
-        if (typeof window.checkWindowVisibility === 'function') {
-          window.checkWindowVisibility();
+      if (typeof window.setKeycodeText === 'function') {
+        window.setKeycodeText('');
+      } else {
+        const keycodeElement = document.getElementById('keycode');
+        if (keycodeElement) {
+          keycodeElement.textContent = '';
         }
+      }
+      
+      // Hide window when code is cleared
+      if (typeof window.checkWindowVisibility === 'function') {
+        window.checkWindowVisibility();
       }
     } else if (response.event === 'error') {
       console.error('Registration error:', response.data);
@@ -192,14 +246,18 @@ export function closeRegistrationConnection(): void {
   }
   
   // Clear keycode display
-  const keycodeElement = document.getElementById('keycode');
-  if (keycodeElement) {
-    keycodeElement.textContent = '';
-    
-    // Hide window when code is cleared
-    if (typeof window.checkWindowVisibility === 'function') {
-      window.checkWindowVisibility();
+  if (typeof window.setKeycodeText === 'function') {
+    window.setKeycodeText('');
+  } else {
+    const keycodeElement = document.getElementById('keycode');
+    if (keycodeElement) {
+      keycodeElement.textContent = '';
     }
+  }
+  
+  // Hide window when code is cleared
+  if (typeof window.checkWindowVisibility === 'function') {
+    window.checkWindowVisibility();
   }
   
   console.log('Registration connection closed');
