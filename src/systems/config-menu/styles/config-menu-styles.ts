@@ -43,7 +43,7 @@ export const configMenuStyles = `
 }
 
 .close-button {
-  background: #e0e5ec;
+  background: #7b76b9;
   border: none;
   border-radius: 50%;
   width: 40px;
@@ -52,19 +52,21 @@ export const configMenuStyles = `
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 2px 2px 4px #b8bec7, -2px -2px 4px #ffffff;
+  box-shadow: none;
   transition: all 0.2s ease;
   font-size: 20px;
-  color: #5a5590;
+  color: white;
 }
 
 .close-button:hover {
   transform: scale(1.1);
-  box-shadow: 1px 1px 2px #b8bec7, -1px -1px 2px #ffffff;
+  background: #6a659f;
+  box-shadow: none;
 }
 
 .close-button:active {
-  box-shadow: inset 1px 1px 2px #b8bec7, inset -1px -1px 2px #ffffff;
+  box-shadow: none;
+  transform: scale(0.95);
 }
 
 .config-menu-content {

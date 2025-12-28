@@ -126,7 +126,7 @@ export class ConfigMenu {
       <div class="config-menu-container">
         <div class="config-menu-header">
           <h2 class="config-menu-title">Configuración</h2>
-          <button class="close-button" data-action="close">×</button>
+          <button class="close-button" data-action="close">✕</button>
         </div>
         
         <div class="config-menu-content">
@@ -172,21 +172,16 @@ export class ConfigMenu {
     const actionButtons = this.container.querySelectorAll('[data-action]');
 
     if (closeButton) {
-      new MouseMoveButton({
-        button: closeButton as HTMLElement,
-        clickHandler: () => this.hide()
-      });
+      // Don't use MouseMoveButton for close button - use CSS styles like confirmation button
+      closeButton.addEventListener('click', () => this.hide());
     }
 
     viewButtons.forEach(button => {
-      new MouseMoveButton({
-        button: button as HTMLElement,
-        clickHandler: (event) => {
-          const target = event.target as HTMLElement;
-          const view = target.dataset.view;
-          if (view) {
-            this.switchView(view);
-          }
+      button.addEventListener('click', (event) => {
+        const target = event.target as HTMLElement;
+        const view = target.dataset.view;
+        if (view) {
+          this.switchView(view);
         }
       });
     });
@@ -194,13 +189,10 @@ export class ConfigMenu {
     actionButtons.forEach(button => {
       const action = (button as HTMLElement).dataset.action;
       if (action && action !== 'close') {
-        new MouseMoveButton({
-          button: button as HTMLElement,
-          clickHandler: () => {
-            this.handleAction(action).catch(error => {
-              console.error('Error handling action:', action, error);
-            });
-          }
+        button.addEventListener('click', () => {
+          this.handleAction(action).catch(error => {
+            console.error('Error handling action:', action, error);
+          });
         });
       }
     });
