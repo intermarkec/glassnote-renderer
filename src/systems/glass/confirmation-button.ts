@@ -99,7 +99,7 @@ export class ConfirmationButton {
   private _loadIcon(): void {
     const self = this;
     
-    FileLoader.loadText('/xbutton.svg')
+    FileLoader.loadText('../xbutton.svg')
       .then(function(svgContent: string) {
         self._processSvgContent(svgContent);
       })
@@ -111,6 +111,12 @@ export class ConfirmationButton {
 
   private _processSvgContent(svgContent: string): void {
     try {
+      if (!this.button) {
+        console.error('Button is null in _processSvgContent');
+        this._fallbackToTextButton();
+        return;
+      }
+      
       const parser = new DOMParser();
       const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
       const svgElement = svgDoc.querySelector('svg');
@@ -127,8 +133,8 @@ export class ConfirmationButton {
           display: 'block'
         });
         
-        this.button!.innerHTML = '';
-        this.button!.appendChild(svgElement);
+        this.button.innerHTML = '';
+        this.button.appendChild(svgElement);
       } else {
         throw new Error('No SVG element found');
       }
@@ -139,18 +145,27 @@ export class ConfirmationButton {
   }
 
   private _fallbackToTextButton(): void {
-    Object.assign(this.button!.style, {
+    if (!this.button) {
+      console.error('Button is null in _fallbackToTextButton');
+      return;
+    }
+    Object.assign(this.button.style, {
       color: 'white',
       fontSize: '24px',
       fontWeight: 'bold'
     });
-    this.button!.textContent = '✕';
+    this.button.textContent = '✕';
   }
 
   private _positionButton(): void {
     const self = this;
     
     const positionButton = () => {
+      if (!this.button) {
+        console.error('Button is null in _positionButton');
+        return;
+      }
+      
       const glassContent = this.glass.img.querySelector('.glass-content');
       if (!glassContent) {
         requestAnimationFrame(positionButton);
@@ -173,7 +188,7 @@ export class ConfirmationButton {
       }
 
       // Aplicar estilos de posicionamiento
-      Object.assign(this.button!.style, buttonStyles);
+      Object.assign(this.button.style, buttonStyles);
     };
 
     requestAnimationFrame(positionButton);
@@ -182,22 +197,32 @@ export class ConfirmationButton {
   private _setupEventListeners(): void {
     const self = this;
 
+    if (!this.button) {
+      console.error('Button is null in _setupEventListeners');
+      return;
+    }
+
     // Hover effects para desktop
-    this.button!.addEventListener('mouseover', function() {
+    this.button.addEventListener('mouseover', function() {
       self._handleMouseOver();
     });
 
-    this.button!.addEventListener('mouseout', function() {
+    this.button.addEventListener('mouseout', function() {
       self._handleMouseOut();
     });
 
     // Click handler
-    this.button!.addEventListener('click', function() {
+    this.button.addEventListener('click', function() {
       self._handleClick();
     });
   }
 
   private _handleMouseOver(): void {
+    if (!this.button) {
+      console.error('Button is null in _handleMouseOver');
+      return;
+    }
+    
     try {
       // Use centralized passthrough manager if available
       if (window.passthroughManager) {
@@ -211,15 +236,20 @@ export class ConfirmationButton {
     }
 
     // Efecto hover simple - solo escala
-    const currentTransform = this.button!.style.transform;
-    this.button!.style.transform = currentTransform.indexOf('translateX') !== -1
+    const currentTransform = this.button.style.transform;
+    this.button.style.transform = currentTransform.indexOf('translateX') !== -1
       ? 'translateX(-50%) scale(1.1)'
       : 'scale(1.1)';
-    this.button!.style.backgroundColor = '#6a659f'; // Morado más oscuro en hover
-    this.button!.style.boxShadow = 'none'; // Sin glow
+    this.button.style.backgroundColor = '#6a659f'; // Morado más oscuro en hover
+    this.button.style.boxShadow = 'none'; // Sin glow
   }
 
   private _handleMouseOut(): void {
+    if (!this.button) {
+      console.error('Button is null in _handleMouseOut');
+      return;
+    }
+    
     try {
       // Use centralized passthrough manager if available
       if (window.passthroughManager) {
@@ -233,19 +263,24 @@ export class ConfirmationButton {
     }
 
     // Remover efectos hover
-    const currentTransform = this.button!.style.transform;
-    this.button!.style.transform = currentTransform.indexOf('translateX') !== -1
+    const currentTransform = this.button.style.transform;
+    this.button.style.transform = currentTransform.indexOf('translateX') !== -1
       ? 'translateX(-50%)'
       : 'none';
-    this.button!.style.backgroundColor = '#7b76b9'; // Volver al morado original
-    this.button!.style.boxShadow = 'none'; // Sin glow
+    this.button.style.backgroundColor = '#7b76b9'; // Volver al morado original
+    this.button.style.boxShadow = 'none'; // Sin glow
   }
 
   private _handleClick(): void {
+    if (!this.button) {
+      console.error('Button is null in _handleClick');
+      return;
+    }
+    
     // Deshabilitar botón inmediatamente
-    this.button!.disabled = true;
-    this.button!.style.opacity = '0.5';
-    this.button!.style.cursor = 'default';
+    this.button.disabled = true;
+    this.button.style.opacity = '0.5';
+    this.button.style.cursor = 'default';
     
     this._sendConfirmationResponse();
     this.glass.finishGlass();
