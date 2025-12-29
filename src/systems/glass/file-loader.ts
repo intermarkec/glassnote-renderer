@@ -82,13 +82,29 @@ export class FileLoader {
    * @returns Versión del package
    */
   static loadPackageVersion(): Promise<string> {
-    return FileLoader.loadJSON('./package.json')
-      .then(function(packageData) {
-        return packageData.version || 'TEMPORAL'
-      })
-      .catch(function() {
-        return 'TEMPORAL'
-      })
+    // Build absolute path based on current window location
+    const basePath = window.location.origin + window.location.pathname;
+    const directory = basePath.substring(0, basePath.lastIndexOf('/'));
+    const absolutePath = directory + '/package.json';
+    
+    // Try multiple possible paths for package.json
+    const paths = ['./package.json', '/package.json', '../package.json', absolutePath];
+    
+    const tryLoad = (index: number): Promise<string> => {
+      if (index >= paths.length) {
+        return Promise.resolve('TEMPORAL');
+      }
+      
+      return FileLoader.loadJSON(paths[index])
+        .then(function(packageData) {
+          return packageData.version || 'TEMPORAL';
+        })
+        .catch(function() {
+          return tryLoad(index + 1);
+        });
+    };
+    
+    return tryLoad(0);
   }
 
   /**

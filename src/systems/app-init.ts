@@ -6,21 +6,21 @@ if (uuidFromURL) {
   window.uuid = uuidFromURL
 }
 
-// Initialize Electron API if available
-if (window.electronAPI) {
-  window.electronAPI.receive('app-data', function(data: any) {
-    window.appVersion = data.version
-  })
+// Try to get version from URL query parameter (primary source for Electron version)
+console.log('URL search:', window.location.search)
+const versionFromURL = window.getURLParameter ? window.getURLParameter('version') : null
+console.log('Version from URL parameter:', versionFromURL)
 
-  // Receive servers list - just log it but don't connect automatically
-  window.electronAPI.receive('servers-list', function(servers: string[]) {
-    window.servers = servers // Keep for backward compatibility
-    // DO NOT connect automatically - let user-data-manager handle the connections
-  })
+if (versionFromURL) {
+  window.appVersion = versionFromURL
+  console.log('App version from URL parameter:', window.appVersion)
 } else {
-  // Use centralized platform detection to determine correct version
-  // Check if platform detection functions are available
-  if (window.getPlatformContext) {
+  // No version in URL - fallback based on platform
+  if (window.electronAPI) {
+    // In Electron but no version parameter - use empty string (will show as empty in splash)
+    window.appVersion = ''
+    console.warn('No version parameter in URL, using empty string for Electron version')
+  } else if (window.getPlatformContext) {
     const platform = window.getPlatformContext();
     if (platform === 'android') {
       window.appVersion = 'MOVIL';
@@ -30,15 +30,32 @@ if (window.electronAPI) {
       window.appVersion = 'MOVIL'; // Fallback
     }
   } else {
-    // Fallback to old logic
     window.appVersion = 'MOVIL'
   }
+}
+
+// Initialize Electron API if available (for other purposes like servers list)
+if (window.electronAPI) {
+  // Receive servers list - just log it but don't connect automatically
+  window.electronAPI.receive('servers-list', function(servers: string[]) {
+    window.servers = servers // Keep for backward compatibility
+    // DO NOT connect automatically - let user-data-manager handle the connections
+  })
   
-  // Load servers using centralized user data manager
+  // Optionally still listen to app-data for backward compatibility, but ignore if we already have version
+  window.electronAPI.receive('app-data', function(data: any) {
+    console.log('App data received (backup):', JSON.stringify(data))
+    // Only update if appVersion is still empty
+    if (!window.appVersion && data.version) {
+      window.appVersion = data.version
+      console.log('App version updated from IPC backup:', window.appVersion)
+    }
+  })
+} else {
+  // Not in Electron - load servers using centralized user data manager
   if (window.userDataManager) {
     window.userDataManager.getServers().then(function(servers: string[]) {
       window.servers = servers // Keep for backward compatibility
-      // DO NOT connect automatically - connections will be handled by user-data-manager
     }).catch(function(error: any) {
       console.error('Error loading servers: ' + error)
       window.servers = []

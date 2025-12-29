@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node copy-package-json.js",
     "preview": "vite preview",
     "build:watch": "vite build --watch"
   },

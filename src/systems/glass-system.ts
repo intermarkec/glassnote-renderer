@@ -3,6 +3,7 @@ import { HTMLProcessor } from './glass/html-processor';
 import { SVGProcessor } from './glass/svg-processor';
 import { ImageProcessor } from './glass/image-processor';
 import { ConfirmationButton } from './glass/confirmation-button';
+import { FileLoader } from './glass/file-loader';
 
 // Basic Glass system implementation for TypeScript + Vue migration
 
@@ -322,20 +323,6 @@ class Glass {
   }
 }
 
-// FileLoader implementation for package version loading
-class FileLoader {
-  static async loadPackageVersion(): Promise<string> {
-    try {
-      // In a real implementation, this would load from package.json
-      // For now, return a default version
-      return '1.0.0'
-    } catch (error) {
-      console.error('Failed to load package version:', error)
-      throw error
-    }
-  }
-}
-
 // Sound system for playing glass sounds
 class SoundSystem {
   static playQueueSound(): void {
@@ -354,7 +341,6 @@ window.activeGlasses = window.activeGlasses || new Map()
 
 // Make classes globally available
 window.Glass = Glass as any
-;(window as any).FileLoader = FileLoader
 window.playQueueSound = SoundSystem.playQueueSound
 
 // Duplicate message detection
@@ -376,4 +362,4 @@ if (!window.checkWindowVisibility) {
 }
 
 // Export for use in other modules
-export { Glass, FileLoader, SoundSystem }
+export { Glass, SoundSystem, FileLoader }
