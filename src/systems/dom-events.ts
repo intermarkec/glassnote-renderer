@@ -1,4 +1,19 @@
 import { GlassData } from '../utils/global'
+import { serviceRegistry } from '../services/registry'
+import { IWindowVisibility } from '../services/interfaces'
+
+/**
+ * Get the window visibility service
+ */
+function getWindowVisibilityService(): IWindowVisibility {
+  try {
+    return serviceRegistry.get('windowVisibility') as IWindowVisibility
+  } catch (error) {
+    // Service not registered - this should not happen in production
+    console.error('WindowVisibility service not available:', error)
+    throw error
+  }
+}
 
 // Screen event handling for Android WebView communication
 window.handleScreenEvent = function(event: string): void {
@@ -73,8 +88,10 @@ function addToUnifiedQueue(url: string | null, message: any): void {
   }
  
   // Show window to allow presence detection
-  if (window.checkWindowVisibility) {
-    window.checkWindowVisibility()
+  try {
+    getWindowVisibilityService().checkWindowVisibility()
+  } catch (error) {
+    console.error('Failed to check window visibility:', error)
   }
 }
 
@@ -105,8 +122,10 @@ function canDisplayGlass(glassData: GlassData): boolean {
   if (data.needPresent === true && !window.is_user_present) {
     // Set user presence to false to ensure window visibility
     window.is_user_present = false
-    if (window.checkWindowVisibility) {
-      window.checkWindowVisibility()
+    try {
+      getWindowVisibilityService().checkWindowVisibility()
+    } catch (error) {
+      console.error('Failed to check window visibility:', error)
     }
     return false
   }
@@ -168,8 +187,10 @@ function processUnifiedQueue(): void {
   }
   
   // Update window visibility after processing queue
-  if (window.checkWindowVisibility) {
-    window.checkWindowVisibility()
+  try {
+    getWindowVisibilityService().checkWindowVisibility()
+  } catch (error) {
+    console.error('Failed to check window visibility:', error)
   }
 }
 

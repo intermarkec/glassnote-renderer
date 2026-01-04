@@ -70,6 +70,7 @@ export class ServiceRegistry {
       'glassSystem',
       'configMenu',
       'soundSystem',
+      'windowVisibility',
       'domEvents'
     ];
 

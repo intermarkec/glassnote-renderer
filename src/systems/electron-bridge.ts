@@ -273,7 +273,7 @@ declare global {
     showRegistrationCode?: () => void;
     hideRegistrationCode?: () => void;
     showConfigMenu?: (view: string) => void;
-    checkWindowVisibility?: () => void;
+    // checkWindowVisibility is now handled by WindowVisibilityService
   }
 }
 
@@ -303,9 +303,5 @@ window.showConfigMenu = (view: string) => {
   }
 };
 
-window.checkWindowVisibility = () => {
-  const bridge = getElectronBridge();
-  if (bridge) {
-    bridge.showWindow();
-  }
-};
+// checkWindowVisibility is now handled by WindowVisibilityService
+// No longer attached to window object

@@ -142,3 +142,28 @@ export interface IDomEvents {
   removeEventListener(type: string, handler: EventListener): void;
   dispatchEvent(event: Event): boolean;
 }
+
+export interface IWindowVisibility {
+  /**
+   * Show the application window (bring to front, make visible)
+   */
+  showWindow(): void;
+  
+  /**
+   * Hide the application window (minimize or make transparent)
+   */
+  hideWindow(): void;
+  
+  /**
+   * Check if window should be visible based on application state
+   * and show/hide accordingly
+   */
+  checkWindowVisibility(): void;
+  
+  /**
+   * Get current window visibility state
+   */
+  isWindowVisible(): boolean;
+  
+  initialize?(): Promise<void>;
+}

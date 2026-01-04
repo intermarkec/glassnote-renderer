@@ -5,6 +5,20 @@ import { ImageProcessor } from './glass/image-processor';
 import { ConfirmationButton } from './glass/confirmation-button';
 import { FileLoader } from './glass/file-loader';
 import { serviceRegistry } from '../services/registry';
+import { IWindowVisibility } from '../services/interfaces';
+
+/**
+ * Get the window visibility service
+ */
+function getWindowVisibilityService(): IWindowVisibility {
+  try {
+    return serviceRegistry.get('windowVisibility') as IWindowVisibility
+  } catch (error) {
+    // Service not registered - this should not happen in production
+    console.error('WindowVisibility service not available:', error)
+    throw error
+  }
+}
 
 // Basic Glass system implementation for TypeScript + Vue migration
 
@@ -319,8 +333,10 @@ class Glass {
     this.confirmationCounted = false;
 
     // Check window visibility
-    if (typeof window.checkWindowVisibility === 'function') {
-      window.checkWindowVisibility()
+    try {
+      getWindowVisibilityService().checkWindowVisibility()
+    } catch (error) {
+      console.error('Failed to check window visibility:', error)
     }
   }
 }
@@ -341,13 +357,8 @@ window.isDuplicateMessage = function(messageId: string, _position: string): bool
   )
 }
 
-// Window visibility checking - only define if not already defined
-if (!window.checkWindowVisibility) {
-  window.checkWindowVisibility = function(): void {
-    // Simple implementation - in Electron this would show/hide the window
-    console.log('Window visibility check')
-  }
-}
+// Window visibility checking is now handled by WindowVisibilityService
+// No need to define a fallback on window object
 
 // Export for use in other modules
 export { Glass, FileLoader }

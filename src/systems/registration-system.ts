@@ -1,9 +1,25 @@
 // Registration system for GlassNote (TypeScript implementation)
 // Based on original renderer/registration-websocket.js
 
+import { serviceRegistry } from '../services/registry';
+import { IWindowVisibility } from '../services/interfaces';
+
 // Global variables
 let registrationWebSocket: WebSocket | null = null;
 let isRegistrationInProgress = false;
+
+/**
+ * Get the window visibility service
+ */
+function getWindowVisibilityService(): IWindowVisibility {
+  try {
+    return serviceRegistry.get('windowVisibility') as IWindowVisibility
+  } catch (error) {
+    // Service not registered - this should not happen in production
+    console.error('WindowVisibility service not available:', error)
+    throw error
+  }
+}
 
 // Default registration server URL
 const DEFAULT_REGISTRATION_SERVER_URL = 'wss://glassnotereg.intermark.ec/ws';
@@ -224,8 +240,10 @@ async function handleRegistrationResponse(response: any): Promise<void> {
       console.log('Registration code received:', response.data.keycode);
       
       // Show window when code is displayed
-      if (typeof window.checkWindowVisibility === 'function') {
-        window.checkWindowVisibility();
+      try {
+        getWindowVisibilityService().checkWindowVisibility();
+      } catch (error) {
+        console.error('Failed to check window visibility:', error);
       }
     } else if (response.event === 'register' && response.data && response.data.server) {
       const serverUrl = response.data.server;
@@ -277,8 +295,10 @@ async function handleRegistrationResponse(response: any): Promise<void> {
       }
       
       // Hide window when code is cleared
-      if (typeof window.checkWindowVisibility === 'function') {
-        window.checkWindowVisibility();
+      try {
+        getWindowVisibilityService().checkWindowVisibility();
+      } catch (error) {
+        console.error('Failed to check window visibility:', error);
       }
     } else if (response.event === 'error') {
       console.error('Registration error:', response.data);
@@ -306,8 +326,10 @@ export function closeRegistrationConnection(): void {
   }
   
   // Hide window when code is cleared
-  if (typeof window.checkWindowVisibility === 'function') {
-    window.checkWindowVisibility();
+  try {
+    getWindowVisibilityService().checkWindowVisibility();
+  } catch (error) {
+    console.error('Failed to check window visibility:', error);
   }
   
   console.log('Registration connection closed');
