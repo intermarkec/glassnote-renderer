@@ -50,6 +50,11 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     this.retryCounts.clear();
     this.connectingServers.clear();
     this.certificateFailures.clear();
+    
+    // Clear global activeConnections for backward compatibility
+    if (window.activeConnections) {
+      window.activeConnections.clear();
+    }
   }
 
   /**
@@ -245,6 +250,13 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     ws.onopen = () => {
       this.connectingServers.delete(url);
       this.activeConnections.set(url, ws);
+      
+      // Update global activeConnections for backward compatibility
+      if (!window.activeConnections) {
+        window.activeConnections = new Map();
+      }
+      window.activeConnections.set(url, ws);
+      
       this.handleConnectionSuccess(url, ws);
     };
     
@@ -324,6 +336,12 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
   private handleConnectionClose(url: string, event: CloseEvent): void {
     this.connectingServers.delete(url);
     this.activeConnections.delete(url);
+    
+    // Also remove from global activeConnections for backward compatibility
+    if (window.activeConnections) {
+      window.activeConnections.delete(url);
+    }
+    
     this.cleanupConnectionTimers(url);
     this.scheduleReconnection(url, event);
   }

@@ -4,6 +4,7 @@ import { ConfigView, ConfigData } from './views/config-view';
 import { configMenuStyles } from './styles/config-menu-styles';
 import { Transaction, PendingRequest, ReviewTransaction } from './types';
 import { PassthroughManager } from './passthrough-manager';
+import { serviceRegistry } from '../../services/registry';
 
 // Global function to toggle config menu (similar to original implementation)
 export function toggleConfigMenu(view?: string): void {
@@ -54,9 +55,8 @@ export class ConfigMenu {
     
     this.setupStyles();
     this.setupEventListeners();
-    this.setupWebSocketListener();
     
-    console.log('ConfigMenu: Initialization complete, global handler set:', !!window._handleWebSocketMessage);
+    console.log('ConfigMenu: Initialization complete');
   }
 
   private setupStyles(): void {
@@ -333,17 +333,77 @@ export class ConfigMenu {
     return this.isVisible;
   }
   
-    private setupWebSocketListener(): void {
+    private async requestTransactions(): Promise<void> {
+      try {
+        this.currentRequestId = 'review_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        this.pendingRequestsMap.clear();
+        this.accumulatedTransactions.clear();
+        
+        const message = {
+          event: 'review',
+          data: {
+            limit: 10,
+            requestId: this.currentRequestId
+          }
+        };
+        
+        console.log('ConfigMenu: Requesting transactions from all servers, requestId:', this.currentRequestId);
+        
+        // Use window.activeConnections which should be maintained by the WebSocket manager
+        if (window.activeConnections && window.activeConnections.size > 0) {
+          let requestsSent = 0;
+          window.activeConnections.forEach((ws, url) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              console.log('ConfigMenu: Sending review request to:', url);
+              ws.send(JSON.stringify(message));
+              this.pendingRequestsMap.set(url, {
+                serverUrl: url,
+                timestamp: Date.now(),
+                requestId: this.currentRequestId!
+              });
+              requestsSent++;
+            } else {
+              console.log('ConfigMenu: Skipping server', url, '- WebSocket state:', ws.readyState);
+            }
+          });
+          
+          console.log('ConfigMenu: Total requests sent:', requestsSent);
+          
+          if (requestsSent === 0) {
+            console.log('ConfigMenu: No open connections available');
+            this.reviewView.showNoConnections();
+          } else {
+            this.reviewView.showLoadingWithServers(requestsSent);
+            
+            // Set up a listener for review responses
+            this.setupReviewResponseListener();
+            
+            setTimeout(() => {
+              this.handleRequestTimeout();
+            }, 5000);
+          }
+        } else {
+          console.log('ConfigMenu: No active connections available');
+          this.reviewView.showNoConnections();
+        }
+      } catch (error) {
+        console.error('ConfigMenu: Error requesting transactions:', error);
+        this.reviewView.showNoConnections();
+      }
+    }
+    
+    private setupReviewResponseListener(): void {
+      // Store the original WebSocket message handler if it exists
       const originalHandleWebSocketMessage = window._handleWebSocketMessage || null;
-      
-      console.log('ConfigMenu: Setting up WebSocket listener, original handler exists:', !!originalHandleWebSocketMessage);
       
       if (originalHandleWebSocketMessage) {
         window._originalHandleWebSocketMessage = originalHandleWebSocketMessage;
       }
       
+      // Set up a temporary handler to catch review responses
       window._handleWebSocketMessage = async (url: string, event: MessageEvent) => {
-        console.log('ConfigMenu: WebSocket message handler called for URL:', url);
+        console.log('ConfigMenu: Review response listener called for URL:', url);
         
         try {
           const message = JSON.parse(event.data);
@@ -371,6 +431,8 @@ export class ConfigMenu {
             if (this.pendingRequestsMap.size === 0) {
               console.log('ConfigMenu: All responses received, displaying accumulated transactions');
               this.displayAccumulatedTransactions();
+              // Clean up the temporary handler
+              this.cleanupReviewResponseListener();
             }
             
             // Return after processing review message
@@ -381,78 +443,20 @@ export class ConfigMenu {
         }
         
         // For non-review messages or parsing errors, pass them to the original handler
-        // If no original handler, the message will be lost but that's okay because
-        // the WebSocket manager should have already handled it
         if (window._originalHandleWebSocketMessage) {
           window._originalHandleWebSocketMessage(url, event);
         }
       };
-      
-      // Restore original WebSocket handlers for existing connections
-      this.restoreOriginalWebSocketHandlers();
     }
     
-    private restoreOriginalWebSocketHandlers(): void {
-      if (window.activeConnections && window.activeConnections.size > 0) {
-        console.log('ConfigMenu: Restoring original WebSocket handlers for existing connections');
-        window.activeConnections.forEach((ws, url) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            console.log('ConfigMenu: Restoring WebSocket handler for URL:', url);
-            // The WebSocket manager will set up its own handler when creating connections
-            // We don't need to do anything here because we're not reconfiguring handlers
-          }
-        });
-      }
-    }
-  
-    private requestTransactions(): void {
-      this.currentRequestId = 'review_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      
-      this.pendingRequestsMap.clear();
-      this.accumulatedTransactions.clear();
-      
-      const message = {
-        event: 'review',
-        data: {
-          limit: 10,
-          requestId: this.currentRequestId
-        }
-      };
-      
-      console.log('ConfigMenu: Requesting transactions from all servers, requestId:', this.currentRequestId);
-      
-      if (window.activeConnections && window.activeConnections.size > 0) {
-        let requestsSent = 0;
-        window.activeConnections.forEach((ws, url) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            console.log('ConfigMenu: Sending review request to:', url);
-            ws.send(JSON.stringify(message));
-            this.pendingRequestsMap.set(url, {
-              serverUrl: url,
-              timestamp: Date.now(),
-              requestId: this.currentRequestId!
-            });
-            requestsSent++;
-          } else {
-            console.log('ConfigMenu: Skipping server', url, '- WebSocket state:', ws.readyState);
-          }
-        });
-        
-        console.log('ConfigMenu: Total requests sent:', requestsSent);
-        
-        if (requestsSent === 0) {
-          console.log('ConfigMenu: No open connections available');
-          this.reviewView.showNoConnections();
-        } else {
-          this.reviewView.showLoadingWithServers(requestsSent);
-          
-          setTimeout(() => {
-            this.handleRequestTimeout();
-          }, 5000);
-        }
+    private cleanupReviewResponseListener(): void {
+      // Restore the original handler if it exists
+      if (window._originalHandleWebSocketMessage) {
+        window._handleWebSocketMessage = window._originalHandleWebSocketMessage;
+        window._originalHandleWebSocketMessage = undefined;
       } else {
-        console.log('ConfigMenu: No active connections available');
-        this.reviewView.showNoConnections();
+        // If there was no original handler, remove ours
+        window._handleWebSocketMessage = undefined;
       }
     }
   
