@@ -1,18 +1,15 @@
-import { ElectronBridge } from '../electron-bridge';
+import { serviceRegistry } from '../../services/registry';
+import { IPassthroughService } from '../../services/interfaces';
 
 /**
- * Centralized manager for mouse event passthrough functionality
- * Handles the logic for enabling/disabling mouse event passthrough
- * based on mouse position relative to config menu container
+ * Adapter for the centralized passthrough service
+ * Maintains compatibility with existing code while delegating to the new service
  */
 export class PassthroughManager {
   private static instance: PassthroughManager;
   private container: HTMLElement | null = null;
-  private isPassthroughEnabled: boolean = false;
-  private isMouseOverContainer: boolean = false;
-  private mouseMoveHandler: ((event: MouseEvent) => void) | null = null;
-  private mouseDownHandler: ((event: MouseEvent) => void) | null = null;
-  private electronBridge: ElectronBridge | null = null;
+  private elementId: string | null = null;
+  private passthroughService: IPassthroughService | null = null;
 
   private constructor() {
     // Private constructor for singleton pattern
@@ -31,105 +28,48 @@ export class PassthroughManager {
   /**
    * Initialize the passthrough manager with a container
    */
-  public initialize(container: HTMLElement, electronBridge?: ElectronBridge): void {
+  public initialize(container: HTMLElement): void {
     this.container = container;
-    if (electronBridge) {
-      this.electronBridge = electronBridge;
+    
+    // Get the passthrough service from registry
+    try {
+      this.passthroughService = serviceRegistry.get<IPassthroughService>('passthrough');
+    } catch (error) {
+      console.error('PassthroughService not available in registry:', error);
+      return;
     }
     
-    // Clean up any existing handlers
-    this.cleanupEventListeners();
+    // Generate unique ID for this container
+    this.elementId = `config-menu-${Date.now()}`;
     
-    // Set up mouse event tracking
-    this.setupMouseEventTracking();
-    
-    // Initially enable passthrough when menu is shown
-    this.setPassthrough(true);
-  }
-
-  /**
-   * Set up mouse event tracking to detect when mouse enters/leaves the container
-   */
-  private setupMouseEventTracking(): void {
-    if (!this.container) return;
-
-    // Track mouse position globally to detect when it's over the container
-    // We need to use document-level events to capture mouse movement even when passthrough is enabled
-    this.mouseMoveHandler = (event: MouseEvent) => {
-      this.handleMouseMove(event);
-    };
-
-    this.mouseDownHandler = (event: MouseEvent) => {
-      this.handleMouseDown(event);
-    };
-
-    // Use capture phase to ensure we get events before they might be blocked
-    document.addEventListener('mousemove', this.mouseMoveHandler, { capture: true });
-    document.addEventListener('mousedown', this.mouseDownHandler, { capture: true });
-  }
-
-  /**
-   * Handle mouse move events to track position relative to container
-   */
-  private handleMouseMove(event: MouseEvent): void {
-    if (!this.container) return;
-
-    const isInside = this.isMouseInsideContainer(event.clientX, event.clientY);
-    
-    if (isInside && !this.isMouseOverContainer) {
-      // Mouse entered the container
-      this.isMouseOverContainer = true;
-      this.setPassthrough(false); // Disable passthrough to allow interaction with buttons
-    } else if (!isInside && this.isMouseOverContainer) {
-      // Mouse left the container
-      this.isMouseOverContainer = false;
-      this.setPassthrough(true); // Enable passthrough to allow clicking through to other windows
-    }
-  }
-
-  /**
-   * Handle mouse down events to check position (in case mouse entered without movement)
-   */
-  private handleMouseDown(event: MouseEvent): void {
-    if (!this.container) return;
-
-    const isInside = this.isMouseInsideContainer(event.clientX, event.clientY);
-    
-    if (isInside && !this.isMouseOverContainer) {
-      // Mouse is inside container but we didn't detect it via mousemove
-      this.isMouseOverContainer = true;
-      this.setPassthrough(false);
-    }
-  }
-
-  /**
-   * Check if mouse coordinates are inside the container
-   */
-  private isMouseInsideContainer(clientX: number, clientY: number): boolean {
-    if (!this.container) return false;
-    
-    const rect = this.container.getBoundingClientRect();
-    return (
-      clientX >= rect.left &&
-      clientX <= rect.right &&
-      clientY >= rect.top &&
-      clientY <= rect.bottom
+    // Register the container with the service
+    this.passthroughService.registerElement(
+      this.elementId,
+      () => this.container,
+      100 // High priority for config menu
     );
+    
+    console.log(`PassthroughManager: Registered container as "${this.elementId}"`);
   }
 
   /**
    * Enable or disable mouse event passthrough
    */
   public setPassthrough(enable: boolean): void {
-    if (this.isPassthroughEnabled === enable) return;
-    
-    this.isPassthroughEnabled = enable;
-    
+    if (this.passthroughService) {
+      this.passthroughService.setPassthrough(enable);
+    } else {
+      // Fallback to direct API if service not available
+      this.directSetPassthrough(enable);
+    }
+  }
+
+  /**
+   * Direct passthrough setting (fallback)
+   */
+  private directSetPassthrough(enable: boolean): void {
     // Use Electron bridge if available
-    if (this.electronBridge) {
-      this.electronBridge.setIgnoreMouseEvents(enable);
-    } else if (window.electronAPI) {
-      // Fallback to direct electron API
+    if (window.electronAPI) {
       if (enable) {
         window.electronAPI.send('set-ignore-events-true');
       } else {
@@ -148,30 +88,21 @@ export class PassthroughManager {
   }
 
   /**
-   * Clean up event listeners
-   */
-  private cleanupEventListeners(): void {
-    if (this.mouseMoveHandler) {
-      document.removeEventListener('mousemove', this.mouseMoveHandler, { capture: true });
-      this.mouseMoveHandler = null;
-    }
-    
-    if (this.mouseDownHandler) {
-      document.removeEventListener('mousedown', this.mouseDownHandler, { capture: true });
-      this.mouseDownHandler = null;
-    }
-  }
-
-  /**
    * Clean up and reset the passthrough manager
    */
   public cleanup(): void {
-    this.cleanupEventListeners();
+    // Unregister from service
+    if (this.passthroughService && this.elementId) {
+      this.passthroughService.unregisterElement(this.elementId);
+      this.elementId = null;
+    }
+    
     this.container = null;
-    this.isMouseOverContainer = false;
     
     // Re-enable passthrough when cleaning up (menu is closing)
     this.setPassthrough(true);
+    
+    console.log('PassthroughManager: Cleaned up');
   }
 
   /**
@@ -179,22 +110,29 @@ export class PassthroughManager {
    * Useful for when container position/size changes
    */
   public updatePassthroughState(): void {
-    // We can't get current mouse position without an event
-    // This will be handled by the next mouse event
+    if (this.passthroughService && this.elementId) {
+      this.passthroughService.updateElement(this.elementId);
+    }
   }
 
   /**
    * Check if passthrough is currently enabled
    */
   public isPassthroughActive(): boolean {
-    return this.isPassthroughEnabled;
+    if (this.passthroughService) {
+      return this.passthroughService.isPassthroughActive();
+    }
+    return true; // Default to enabled if service not available
   }
 
   /**
    * Check if mouse is currently over the container
+   * Note: This is now handled by the service, but we can approximate
    */
   public isMouseOver(): boolean {
-    return this.isMouseOverContainer;
+    // This information is now managed by the service
+    // We could query the service if it exposed this information
+    return false;
   }
 
   /**

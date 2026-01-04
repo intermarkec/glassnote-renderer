@@ -109,12 +109,27 @@ export class ElectronBridge {
     // Make the window visible first
     this.checkWindowVisibility();
 
-    // Show the config menu with specified view
-    if (this.configMenu) {
-      this.configMenu.toggle();
+    // Show the config menu with specified view using the global instance
+    if (window._configMenuInstance) {
+      // Use toggleConfigMenu function which handles showing/hiding correctly
+      if (typeof window.toggleConfigMenu === 'function') {
+        window.toggleConfigMenu(view);
+      } else {
+        // Fallback to direct toggle
+        if (window._configMenuInstance.isVisible) {
+          window._configMenuInstance.hide();
+        } else {
+          window._configMenuInstance.show();
+        }
+      }
     } else {
-      console.error('ConfigMenu instance not available');
-      this.showConfigMenuFallback();
+      console.error('ConfigMenu instance not available in window._configMenuInstance');
+      // Try to create instance using toggleConfigMenu if available
+      if (typeof window.toggleConfigMenu === 'function') {
+        window.toggleConfigMenu(view);
+      } else {
+        console.error('toggleConfigMenu function not available');
+      }
     }
   }
 
@@ -122,14 +137,16 @@ export class ElectronBridge {
    * Fallback method to show config menu
    */
   private showConfigMenuFallback(): void {
-    // Create config menu instance if not exists
-    if (!this.configMenu) {
-      this.configMenu = new ConfigMenu();
+    // This method is no longer needed since we use window._configMenuInstance
+    console.warn('showConfigMenuFallback called but should use window._configMenuInstance');
+    
+    // For backward compatibility, ensure window._configMenuInstance exists
+    if (!window._configMenuInstance && typeof window.ConfigMenu === 'function') {
+      window._configMenuInstance = new window.ConfigMenu();
     }
-
-    // Show the config menu
-    if (this.configMenu) {
-      this.configMenu.show();
+    
+    if (window._configMenuInstance) {
+      window._configMenuInstance.show();
     }
   }
 
@@ -147,6 +164,8 @@ export class ElectronBridge {
    */
   public setConfigMenu(configMenu: ConfigMenu): void {
     this.configMenu = configMenu;
+    // Also update the global instance for consistency
+    window._configMenuInstance = configMenu;
   }
 
   /**

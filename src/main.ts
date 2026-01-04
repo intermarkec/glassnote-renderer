@@ -8,6 +8,7 @@ import { WebSocketManagerService } from './services/websocket-manager-service'
 import { UserDataManagerService } from './services/user-data-manager-service'
 import { SoundSystemService } from './services/sound-system-service'
 import { WindowVisibilityService } from './services/window-visibility-service'
+import { PassthroughService } from './services/passthrough-service'
 
 // Import and initialize global utilities (temporary during migration)
 import './utils/compatibility'
@@ -44,11 +45,13 @@ const websocketManagerService = new WebSocketManagerService()
 const userDataManagerService = new UserDataManagerService()
 const soundSystemService = new SoundSystemService()
 const windowVisibilityService = new WindowVisibilityService()
+const passthroughService = PassthroughService.getInstance()
 
 serviceRegistry.register('websocketManager', websocketManagerService)
 serviceRegistry.register('userDataManager', userDataManagerService)
 serviceRegistry.register('soundSystem', soundSystemService)
 serviceRegistry.register('windowVisibility', windowVisibilityService)
+serviceRegistry.register('passthrough', passthroughService)
 
 // TODO: Register other services as they are implemented
 // serviceRegistry.register('glassSystem', new GlassSystemService())

@@ -71,6 +71,7 @@ export class ServiceRegistry {
       'configMenu',
       'soundSystem',
       'windowVisibility',
+      'passthrough',
       'domEvents'
     ];
 

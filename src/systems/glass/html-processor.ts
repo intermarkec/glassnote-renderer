@@ -1,5 +1,7 @@
 import { ScaleCalculator } from './scale-calculator';
 import { FileLoader } from './file-loader';
+import { serviceRegistry } from '../../services/registry';
+import { IPassthroughService } from '../../services/interfaces';
 
 interface GlassInstance {
   img: HTMLElement;
@@ -10,10 +12,19 @@ interface GlassInstance {
 export class HTMLProcessor {
   private glass: GlassInstance;
   private scaleCalculator: ScaleCalculator;
+  private passthroughService: IPassthroughService | null = null;
+  private formElementId: string | null = null;
 
   constructor(glassInstance: GlassInstance) {
     this.glass = glassInstance;
     this.scaleCalculator = new ScaleCalculator();
+    
+    // Try to get passthrough service
+    try {
+      this.passthroughService = serviceRegistry.get<IPassthroughService>('passthrough');
+    } catch (error) {
+      console.warn('PassthroughService not available:', error);
+    }
   }
 
   async process(glassContent: HTMLElement, data: any, upload: any): Promise<void> {
@@ -419,21 +430,65 @@ export class HTMLProcessor {
       if (window.AndroidBridge) {
         window.activeConfirmationGlasses = window.activeConfirmationGlasses || 0;
         window.activeConfirmationGlasses++;
-        // Use centralized passthrough manager if available
-        if (window.passthroughManager) {
-          window.passthroughManager.setPassthrough(false);
-        } else {
-          window.AndroidBridge.setIgnoreEventsFalse();
-        }
+      }
+      
+      // Use centralized passthrough service if available
+      if (this.passthroughService) {
+        this._registerFormWithService(glassContent);
       } else if (window.electronAPI) {
-        this._setupFormMouseEvents(glassContent);
+        // Fallback to direct electron API
+        this._setupFormMouseEventsLegacy(glassContent);
       }
     } catch (e) {
       console.error('Error enabling form touch:', e);
     }
   }
 
-  private _setupFormMouseEvents(glassContent: HTMLElement): void {
+  private _registerFormWithService(glassContent: HTMLElement): void {
+    if (!this.passthroughService) {
+      return;
+    }
+    
+    // Generate unique ID for this form
+    this.formElementId = `form-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Register the form container with the service
+    this.passthroughService.registerElement(
+      this.formElementId,
+      () => glassContent,
+      80 // Medium priority for forms
+    );
+    
+    console.log(`HTMLProcessor: Registered form as "${this.formElementId}"`);
+    
+    // Also register the iframe if it exists
+    const iframe = glassContent.querySelector('iframe');
+    if (iframe) {
+      const iframeId = `${this.formElementId}-iframe`;
+      this.passthroughService.registerElement(
+        iframeId,
+        () => iframe as HTMLElement,
+        80
+      );
+    }
+  }
+
+  private _unregisterFormFromService(): void {
+    if (!this.passthroughService || !this.formElementId) {
+      return;
+    }
+    
+    // Unregister the form
+    this.passthroughService.unregisterElement(this.formElementId);
+    
+    // Also unregister the iframe if it was registered
+    const iframeId = `${this.formElementId}-iframe`;
+    this.passthroughService.unregisterElement(iframeId);
+    
+    this.formElementId = null;
+  }
+
+  private _setupFormMouseEventsLegacy(glassContent: HTMLElement): void {
     const self = this;
     
     const iframe = glassContent.querySelector('iframe');
@@ -443,11 +498,7 @@ export class HTMLProcessor {
     
     iframe.addEventListener('mouseenter', function() {
       try {
-        // Use centralized passthrough manager if available
-        if (window.passthroughManager) {
-          window.passthroughManager.setPassthrough(false);
-        } else if (window.electronAPI) {
-          // Fallback to direct electron API
+        if (window.electronAPI) {
           window.electronAPI.send('set-ignore-events-false');
         }
       } catch (e) {
@@ -457,11 +508,7 @@ export class HTMLProcessor {
     
     iframe.addEventListener('mouseleave', function() {
       try {
-        // Use centralized passthrough manager if available
-        if (window.passthroughManager) {
-          window.passthroughManager.setPassthrough(true);
-        } else if (window.electronAPI) {
-          // Fallback to direct electron API
+        if (window.electronAPI) {
           window.electronAPI.send('set-ignore-events-true');
         }
       } catch (e) {
@@ -471,11 +518,7 @@ export class HTMLProcessor {
     
     glassContent.addEventListener('mouseenter', function() {
       try {
-        // Use centralized passthrough manager if available
-        if (window.passthroughManager) {
-          window.passthroughManager.setPassthrough(false);
-        } else if (window.electronAPI) {
-          // Fallback to direct electron API
+        if (window.electronAPI) {
           window.electronAPI.send('set-ignore-events-false');
         }
       } catch (e) {
@@ -485,11 +528,7 @@ export class HTMLProcessor {
     
     glassContent.addEventListener('mouseleave', function() {
       try {
-        // Use centralized passthrough manager if available
-        if (window.passthroughManager) {
-          window.passthroughManager.setPassthrough(true);
-        } else if (window.electronAPI) {
-          // Fallback to direct electron API
+        if (window.electronAPI) {
           window.electronAPI.send('set-ignore-events-true');
         }
       } catch (e) {
@@ -498,11 +537,7 @@ export class HTMLProcessor {
     });
     
     try {
-      // Use centralized passthrough manager if available
-      if (window.passthroughManager) {
-        window.passthroughManager.setPassthrough(false);
-      } else if (window.electronAPI) {
-        // Fallback to direct electron API
+      if (window.electronAPI) {
         window.electronAPI.send('set-ignore-events-false');
       }
     } catch (e) {
@@ -513,19 +548,30 @@ export class HTMLProcessor {
   private _setupFormResponseCapture(glassContent: HTMLElement, iframe: HTMLIFrameElement): void {
     const self = this;
     
-    window.addEventListener('message', function(event) {
+    const messageHandler = function(event: MessageEvent) {
       if (event.source === iframe.contentWindow) {
         try {
           const messageData = JSON.parse(event.data);
           if (messageData.response) {
             self.glass.formResponse = messageData.response;
+            // Clean up form registration before finishing
+            self._unregisterFormFromService();
             self.glass.finishGlass();
           }
         } catch (e) {
           console.error('Error parsing form response:', e);
         }
       }
-    });
+    };
+    
+    window.addEventListener('message', messageHandler);
+    
+    // Also clean up if the glass finishes without form submission
+    const originalFinishGlass = this.glass.finishGlass;
+    this.glass.finishGlass = () => {
+      self._unregisterFormFromService();
+      originalFinishGlass.call(self.glass);
+    };
   }
 }
 

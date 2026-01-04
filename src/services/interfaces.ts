@@ -167,3 +167,58 @@ export interface IWindowVisibility {
   
   initialize?(): Promise<void>;
 }
+
+export interface IPassthroughService {
+  /**
+   * Register an interactive element that needs passthrough control
+   * @param id Unique identifier for the element
+   * @param getElement Function that returns the element (or null if not available)
+   * @param priority Priority for overlapping elements (higher = more important)
+   */
+  registerElement(id: string, getElement: () => HTMLElement | null, priority?: number): void;
+  
+  /**
+   * Unregister an interactive element
+   * @param id Unique identifier for the element
+   */
+  unregisterElement(id: string): void;
+  
+  /**
+   * Update element bounds (call when element position/size changes)
+   * @param id Unique identifier for the element
+   */
+  updateElement(id: string): void;
+  
+  /**
+   * Enable or disable passthrough directly
+   * @param enable Whether to enable passthrough
+   */
+  setPassthrough(enable: boolean): void;
+  
+  /**
+   * Check if passthrough is currently enabled
+   */
+  isPassthroughActive(): boolean;
+  
+  /**
+   * Start monitoring mouse position and updating passthrough state
+   */
+  startMonitoring(): void;
+  
+  /**
+   * Stop monitoring
+   */
+  stopMonitoring(): void;
+  
+  /**
+   * Get the number of registered elements
+   */
+  getElementCount(): number;
+  
+  /**
+   * Get all registered element IDs
+   */
+  getRegisteredElementIds(): string[];
+  
+  initialize?(): Promise<void>;
+}

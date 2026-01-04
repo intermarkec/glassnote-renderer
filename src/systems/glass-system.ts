@@ -291,11 +291,15 @@ class Glass {
   }
 
   public cleanup(): void {
+    console.log('Glass cleanup called for glass ID:', this.message?.data?.id, 'positionKey:', this.positionKey);
+    
     // Remove from unified queue when glass finishes displaying
     if (window.removeFromUnifiedQueue && this.message && this.message.data) {
       if (this.message.data.messageId) {
+        console.log('Removing from unified queue, messageId:', this.message.data.messageId);
         window.removeFromUnifiedQueue(this.message.data.messageId)
       } else if (this.message.data.id) {
+        console.log('Removing from unified queue, id:', this.message.data.id.toString());
         window.removeFromUnifiedQueue(this.message.data.id.toString())
       }
     }
@@ -317,7 +321,9 @@ class Glass {
 
     // Clean up active position
     if (this.positionKey && window.activeGlasses) {
+      console.log('Deleting from activeGlasses, positionKey:', this.positionKey, 'activeGlasses size before:', window.activeGlasses?.size);
       window.activeGlasses.delete(this.positionKey)
+      console.log('activeGlasses size after:', window.activeGlasses?.size);
     }
 
     // Remove element from DOM
@@ -333,6 +339,7 @@ class Glass {
     this.confirmationCounted = false;
 
     // Check window visibility
+    console.log('Glass cleanup: Calling checkWindowVisibility()');
     try {
       getWindowVisibilityService().checkWindowVisibility()
     } catch (error) {

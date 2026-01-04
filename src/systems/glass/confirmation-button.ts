@@ -1,5 +1,7 @@
 import { ScaleCalculator } from './scale-calculator';
 import { PositionManager, Position } from './position-manager';
+import { serviceRegistry } from '../../services/registry';
+import { IPassthroughService } from '../../services/interfaces';
 
 interface GlassInstance {
   finishGlass: () => void;
@@ -19,12 +21,22 @@ export class ConfirmationButton {
   private buttonHandler: any = null;
   private isDestroyed: boolean = false;
   private animationFrameId: number | null = null;
+  private passthroughService: IPassthroughService | null = null;
+  private buttonElementId: string | null = null;
 
   constructor(glassInstance: GlassInstance, position: Position) {
     this.glass = glassInstance;
     this.position = position;
     this.scaleCalculator = new ScaleCalculator();
     this.positionManager = new PositionManager();
+    
+    // Try to get passthrough service
+    try {
+      this.passthroughService = serviceRegistry.get<IPassthroughService>('passthrough');
+    } catch (error) {
+      console.warn('PassthroughService not available:', error);
+    }
+    
     this.create();
   }
 
@@ -46,10 +58,12 @@ export class ConfirmationButton {
         window.activeConfirmationGlasses = window.activeConfirmationGlasses || 0;
         window.activeConfirmationGlasses++;
         this.glass.confirmationCounted = true;
-        // Use centralized passthrough manager if available
-        if (window.passthroughManager) {
-          window.passthroughManager.setPassthrough(false);
+        
+        // Use centralized passthrough service if available
+        if (this.passthroughService) {
+          this._registerButtonWithService();
         } else {
+          // Fallback to direct Android bridge
           window.AndroidBridge.setIgnoreEventsFalse();
         }
       }
@@ -57,6 +71,33 @@ export class ConfirmationButton {
       console.error('Not in Android environment');
       this.glass.confirmationCounted = false;
     }
+  }
+
+  private _registerButtonWithService(): void {
+    if (!this.passthroughService || !this.button) {
+      return;
+    }
+    
+    // Generate unique ID for this button
+    this.buttonElementId = `confirm-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Register the button with the service
+    this.passthroughService.registerElement(
+      this.buttonElementId,
+      () => this.button,
+      60 // Lower priority for confirmation buttons
+    );
+    
+    console.log(`ConfirmationButton: Registered button as "${this.buttonElementId}"`);
+  }
+
+  private _unregisterButtonFromService(): void {
+    if (!this.passthroughService || !this.buttonElementId) {
+      return;
+    }
+    
+    this.passthroughService.unregisterElement(this.buttonElementId);
+    this.buttonElementId = null;
   }
 
   private _createButton(): void {
@@ -232,18 +273,11 @@ export class ConfirmationButton {
       return;
     }
     
-    try {
-      // Use centralized passthrough manager if available
-      if (window.passthroughManager) {
-        window.passthroughManager.setPassthrough(false);
-      } else if (window.electronAPI) {
-        // Fallback to direct electron API
-        window.electronAPI.send('set-ignore-events-false');
-      }
-    } catch (e) {
-      console.error('Not in Electron environment');
+    // Register button with service on first hover if not already registered
+    if (this.passthroughService && !this.buttonElementId) {
+      this._registerButtonWithService();
     }
-
+    
     // Efecto hover simple - solo escala
     const currentTransform = this.button.style.transform;
     this.button.style.transform = currentTransform.indexOf('translateX') !== -1
@@ -263,18 +297,6 @@ export class ConfirmationButton {
       return;
     }
     
-    try {
-      // Use centralized passthrough manager if available
-      if (window.passthroughManager) {
-        window.passthroughManager.setPassthrough(true);
-      } else if (window.electronAPI) {
-        // Fallback to direct electron API
-        window.electronAPI.send('set-ignore-events-true');
-      }
-    } catch (e) {
-      console.error('Not in Electron environment');
-    }
-
     // Remover efectos hover
     const currentTransform = this.button.style.transform;
     this.button.style.transform = currentTransform.indexOf('translateX') !== -1
@@ -336,6 +358,7 @@ export class ConfirmationButton {
     }
     
     this._disableTouchEvents();
+    this._unregisterButtonFromService();
     
     this.button = null;
     this.buttonHandler = null;
@@ -351,20 +374,13 @@ export class ConfirmationButton {
           }
           this.glass.confirmationCounted = true;
           if (window.activeConfirmationGlasses === 0) {
-            // Use centralized passthrough manager if available
-            if (window.passthroughManager) {
-              window.passthroughManager.setPassthrough(true);
+            // Use centralized passthrough service if available
+            if (this.passthroughService) {
+              // Service will handle passthrough automatically
             } else {
               window.AndroidBridge.setIgnoreEventsTrue();
             }
           }
-        }
-      } else if (window.electronAPI) {
-        // Use centralized passthrough manager if available
-        if (window.passthroughManager) {
-          window.passthroughManager.setPassthrough(true);
-        } else {
-          window.electronAPI.send('set-ignore-events-true');
         }
       }
     } catch (e) {

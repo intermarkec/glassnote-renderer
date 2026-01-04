@@ -38,6 +38,13 @@ export class ConfigMenu {
   private configData: ConfigData = {};
   private passthroughManager: PassthroughManager;
   
+  /**
+   * Get the container element (for external visibility checks)
+   */
+  public getContainer(): HTMLElement {
+    return this.container;
+  }
+  
   // Review system properties
   private pendingRequestsMap: Map<string, {serverUrl: string, timestamp: number, requestId: string}> = new Map();
   private accumulatedTransactions: Map<string, ReviewTransaction[]> = new Map();
@@ -55,6 +62,10 @@ export class ConfigMenu {
     
     this.setupStyles();
     this.setupEventListeners();
+    
+    // Ensure window._configMenuInstance points to this instance
+    window._configMenuInstance = this;
+    console.log('ConfigMenu: window._configMenuInstance set to this instance, isVisible:', this.isVisible);
     
     console.log('ConfigMenu: Initialization complete');
   }
@@ -76,10 +87,17 @@ export class ConfigMenu {
   async show(): Promise<void> {
     if (this.isVisible) return;
     
+    console.log('ConfigMenu: show() called, setting isVisible to true (current value:', this.isVisible, ')');
+    
     this.container.innerHTML = this.generateHTML();
     document.body.appendChild(this.container);
     this.container.style.display = 'flex';
     this.isVisible = true;
+    
+    // Ensure window._configMenuInstance points to this instance
+    window._configMenuInstance = this;
+    
+    console.log('ConfigMenu: isVisible set to', this.isVisible, 'window._configMenuInstance.isVisible:', window._configMenuInstance?.isVisible);
     
     // Initialize passthrough manager with the container
     // We need to get the actual container element (the config-menu-container div)
@@ -100,10 +118,32 @@ export class ConfigMenu {
     if (this.currentView === 'review') {
       this.requestTransactions();
     }
+    
+    // Check window visibility to ensure window stays visible when config menu is open
+    console.log('ConfigMenu: Calling checkWindowVisibility after showing menu, isVisible:', this.isVisible);
+    this.checkWindowVisibility();
+  }
+  
+  /**
+   * Check window visibility using the window visibility service
+   */
+  private checkWindowVisibility(): void {
+    try {
+      const windowVisibilityService = serviceRegistry.get('windowVisibility') as any;
+      if (windowVisibilityService && typeof windowVisibilityService.checkWindowVisibility === 'function') {
+        windowVisibilityService.checkWindowVisibility();
+      } else {
+        console.error('WindowVisibility service not available or missing checkWindowVisibility method');
+      }
+    } catch (error) {
+      console.error('Failed to check window visibility:', error);
+    }
   }
 
   hide(): void {
     if (!this.isVisible) return;
+    
+    console.log('ConfigMenu: hide() called, setting isVisible to false (current value:', this.isVisible, ')');
     
     // Clean up passthrough manager
     this.passthroughManager.cleanup();
@@ -111,6 +151,12 @@ export class ConfigMenu {
     this.container.style.display = 'none';
     this.container.remove();
     this.isVisible = false;
+    
+    console.log('ConfigMenu: isVisible set to', this.isVisible, 'window._configMenuInstance.isVisible:', window._configMenuInstance?.isVisible);
+    
+    // Check window visibility after hiding menu to see if window should still be visible
+    console.log('ConfigMenu: Calling checkWindowVisibility after hiding menu, isVisible:', this.isVisible);
+    this.checkWindowVisibility();
   }
 
   toggle(): void {
