@@ -6,6 +6,7 @@ import './style.css'
 import { serviceRegistry } from './services/registry'
 import { WebSocketManagerService } from './services/websocket-manager-service'
 import { UserDataManagerService } from './services/user-data-manager-service'
+import { SoundSystemService } from './services/sound-system-service'
 
 // Import and initialize global utilities (temporary during migration)
 import './utils/compatibility'
@@ -40,15 +41,16 @@ setupRegistrationSystem()
 // Initialize service registry with services
 const websocketManagerService = new WebSocketManagerService()
 const userDataManagerService = new UserDataManagerService()
+const soundSystemService = new SoundSystemService()
 
 serviceRegistry.register('websocketManager', websocketManagerService)
 serviceRegistry.register('userDataManager', userDataManagerService)
+serviceRegistry.register('soundSystem', soundSystemService)
 
 // TODO: Register other services as they are implemented
 // serviceRegistry.register('glassSystem', new GlassSystemService())
 // serviceRegistry.register('electronBridge', new ElectronBridgeService())
 // serviceRegistry.register('configMenu', new ConfigMenuService())
-// serviceRegistry.register('soundSystem', new SoundSystemService())
 // serviceRegistry.register('appInit', new AppInitService())
 // serviceRegistry.register('domEvents', new DomEventsService())
 

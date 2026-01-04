@@ -4,6 +4,7 @@ import { SVGProcessor } from './glass/svg-processor';
 import { ImageProcessor } from './glass/image-processor';
 import { ConfirmationButton } from './glass/confirmation-button';
 import { FileLoader } from './glass/file-loader';
+import { serviceRegistry } from '../services/registry';
 
 // Basic Glass system implementation for TypeScript + Vue migration
 
@@ -56,9 +57,10 @@ class Glass {
   }
 
   private displayGlass(): void {
-    // Play glass sound if available
-    if (typeof window.playGlassSound === 'function') {
-      window.playGlassSound()
+    // Play glass sound using service
+    const soundSystem = serviceRegistry.get<any>('soundSystem');
+    if (soundSystem && typeof soundSystem.playGlassSound === 'function') {
+      soundSystem.playGlassSound();
     }
 
     this.initialize()
