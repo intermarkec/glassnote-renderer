@@ -10,9 +10,20 @@ const DEFAULT_REGISTRATION_SERVER_URL = 'wss://glassnotereg.intermark.ec/ws';
 
 // Function to generate UUID (compatible with original implementation)
 function generateUUID(): string {
-  // Try to use userDataManager's generateUUID if available
-  if (window.userDataManager && window.userDataManager.generateUUID) {
-    return window.userDataManager.generateUUID();
+  // Try to use userDataManager's generateUUID if available from service registry
+  try {
+    // Check if service registry is available globally
+    if ((window as any).serviceRegistry) {
+      const serviceRegistry = (window as any).serviceRegistry;
+      if (serviceRegistry.has('userDataManager')) {
+        const userDataManager = serviceRegistry.get('userDataManager');
+        if (userDataManager && userDataManager.generateUUID) {
+          return userDataManager.generateUUID();
+        }
+      }
+    }
+  } catch (error) {
+    // Fall through to default implementation
   }
   
   // Fallback implementation
@@ -57,6 +68,25 @@ export async function requestRegistrationCode(): Promise<void> {
   try {
     // Get UUID and OS info for protocol
     let uuid = window.uuid;
+    
+    // Try to get UUID from service registry first
+    if (!uuid) {
+      try {
+        if ((window as any).serviceRegistry) {
+          const serviceRegistry = (window as any).serviceRegistry;
+          if (serviceRegistry.has('userDataManager')) {
+            const userDataManager = serviceRegistry.get('userDataManager');
+            if (userDataManager && userDataManager.getUUID) {
+              uuid = await userDataManager.getUUID();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error getting UUID from service registry:', error);
+      }
+    }
+    
+    // Fallback to old userDataManager if available
     if (!uuid && window.userDataManager) {
       try {
         uuid = await window.userDataManager.getUUID();
@@ -147,7 +177,7 @@ export async function requestRegistrationCode(): Promise<void> {
       console.error('Registration WebSocket error:', error);
     };
 
-    registrationWebSocket.onclose = function(event: CloseEvent) {
+    registrationWebSocket.onclose = function(_event: CloseEvent) {
       console.log('Registration WebSocket connection closed');
       registrationWebSocket = null;
       isRegistrationInProgress = false;
@@ -202,17 +232,37 @@ async function handleRegistrationResponse(response: any): Promise<void> {
       const refreshToken = response.data.refreshToken;
       const refreshTokenHash = response.data.refreshTokenHash;
       
-      // Save server using userDataManager
-      if (window.userDataManager && window.userDataManager.handleRegistrationResponse) {
-        try {
-          await window.userDataManager.handleRegistrationResponse(
-            serverUrl,
-            refreshToken || '',
-            refreshTokenHash
-          );
-          console.log('Server registered successfully:', serverUrl);
-        } catch (error) {
-          console.error('Error saving server:', error);
+      // Save server using userDataManager from service registry
+      try {
+        if ((window as any).serviceRegistry) {
+          const serviceRegistry = (window as any).serviceRegistry;
+          if (serviceRegistry.has('userDataManager')) {
+            const userDataManager = serviceRegistry.get('userDataManager');
+            if (userDataManager && userDataManager.handleRegistrationResponse) {
+              await userDataManager.handleRegistrationResponse(
+                serverUrl,
+                refreshToken || '',
+                refreshTokenHash
+              );
+              console.log('Server registered successfully via service registry:', serverUrl);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error saving server via service registry:', error);
+        
+        // Fallback to old userDataManager if available
+        if (window.userDataManager && window.userDataManager.handleRegistrationResponse) {
+          try {
+            await window.userDataManager.handleRegistrationResponse(
+              serverUrl,
+              refreshToken || '',
+              refreshTokenHash
+            );
+            console.log('Server registered successfully via legacy userDataManager:', serverUrl);
+          } catch (fallbackError) {
+            console.error('Error saving server via legacy userDataManager:', fallbackError);
+          }
         }
       }
 
@@ -267,6 +317,25 @@ export function closeRegistrationConnection(): void {
 export async function handleRegisterButtonClick(): Promise<void> {
   // Get UUID
   let uuid = window.uuid;
+  
+  // Try to get UUID from service registry first
+  if (!uuid) {
+    try {
+      if ((window as any).serviceRegistry) {
+        const serviceRegistry = (window as any).serviceRegistry;
+        if (serviceRegistry.has('userDataManager')) {
+          const userDataManager = serviceRegistry.get('userDataManager');
+          if (userDataManager && userDataManager.getUUID) {
+            uuid = await userDataManager.getUUID();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error getting UUID from service registry:', error);
+    }
+  }
+  
+  // Fallback to old userDataManager if available
   if (!uuid && window.userDataManager) {
     try {
       uuid = await window.userDataManager.getUUID();
@@ -278,7 +347,9 @@ export async function handleRegisterButtonClick(): Promise<void> {
     uuid = localStorage.getItem('device_uuid') || (window.generateUUID ? window.generateUUID() : 'unknown-uuid');
   }
   
-  const registerUrl = `https://glassnote.intermark.ec/suscribe/?uuid=${encodeURIComponent(uuid)}`;
+  // Ensure uuid is not undefined
+  const safeUuid = uuid || 'unknown-uuid';
+  const registerUrl = `https://glassnote.intermark.ec/suscribe/?uuid=${encodeURIComponent(safeUuid)}`;
   
   console.log('Opening registration URL:', registerUrl);
   

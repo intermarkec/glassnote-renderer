@@ -60,9 +60,9 @@ if (typeof Array.from !== 'function') {
       return Math.min(Math.max(len, 0), maxSafeInteger)
     }
 
-    return function from<T>(arrayLike: ArrayLike<T>, mapFn?: (value: T, index: number) => any, thisArg?: any): any[] {
+    return function from<T>(this: any, arrayLike: ArrayLike<T>, mapFn?: (value: T, index: number) => any, thisArg?: any): any[] {
       // 1. Let C be the this value.
-      const C = this as any
+      const C = this
 
       // 2. Let items be ToObject(arrayLike).
       const items = Object(arrayLike)

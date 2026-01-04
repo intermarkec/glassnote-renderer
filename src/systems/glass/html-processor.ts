@@ -175,6 +175,177 @@ export class HTMLProcessor {
 
     let modifiedHtml = tempContainer.innerHTML;
     
+    // JavaScript to inject for button functionality
+    const injectedScript = `
+<script>
+(function() {
+  // Function to collect all form data
+  function collectFormData() {
+    const container = document.querySelector('.container-default') || document.body;
+    const items = [];
+    const processedFieldnames = new Set();
+
+    // Helper to get fieldname from element
+    function getFieldname(el) {
+      return el.getAttribute('fieldname') || el.getAttribute('name') || el.id || null;
+    }
+
+    // Helper to determine element type
+    function getElementType(el) {
+      if (el.classList.contains('btn-toggle') || el.classList.contains('btn-toggle-pulse') || el.classList.contains('btn-toggle-slide')) {
+        return 'toggle';
+      }
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+        return 'input';
+      }
+      if (el.tagName === 'BUTTON') {
+        return 'button';
+      }
+      return el.tagName.toLowerCase();
+    }
+
+    // Helper to determine if element is a toggle
+    function isToggle(el) {
+      return el.classList.contains('btn-toggle') || el.classList.contains('btn-toggle-pulse') || el.classList.contains('btn-toggle-slide');
+    }
+
+    // Process input-like elements
+    const inputs = container.querySelectorAll('input, textarea, select');
+    inputs.forEach(el => {
+      const fieldname = getFieldname(el);
+      if (!fieldname || processedFieldnames.has(fieldname)) return;
+
+      let value = '';
+      let active = false;
+      const type = getElementType(el);
+      if (el.tagName === 'INPUT') {
+        const input = el;
+        const inputType = input.type;
+        if (inputType === 'checkbox' || inputType === 'radio') {
+          value = input.checked ? 'true' : 'false';
+          active = input.checked;
+        } else {
+          value = input.value;
+          active = isToggle(el) ? el.classList.contains('active') : false;
+        }
+      } else if (el.tagName === 'TEXTAREA') {
+        value = el.value;
+        active = isToggle(el) ? el.classList.contains('active') : false;
+      } else if (el.tagName === 'SELECT') {
+        value = el.value;
+        active = isToggle(el) ? el.classList.contains('active') : false;
+      }
+      items.push({ fieldname, value, active: isToggle(el) ? active : undefined, type });
+      processedFieldnames.add(fieldname);
+    });
+
+    // Also include elements with fieldname that are not inputs
+    const fieldElements = container.querySelectorAll('[fieldname]');
+    fieldElements.forEach(el => {
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+        return;
+      }
+      const fieldname = el.getAttribute('fieldname');
+      if (!fieldname || processedFieldnames.has(fieldname)) return;
+      const staticValue = el.getAttribute('value') || '';
+      const type = getElementType(el);
+      const active = isToggle(el) ? el.classList.contains('active') : undefined;
+      items.push({ fieldname, value: staticValue, active, type });
+      processedFieldnames.add(fieldname);
+    });
+
+    return items;
+  }
+
+  // Initialize functionality when DOM is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    // Add toggle functionality
+    const toggleButtons = document.querySelectorAll('.btn-toggle, .btn-toggle-pulse, .btn-toggle-slide');
+    toggleButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        this.classList.toggle('active');
+      });
+    });
+
+    // Add NextPage functionality
+    const nextPageButtons = document.querySelectorAll('.NextPage, .nextPage');
+    nextPageButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const pages = document.querySelectorAll('[id^="page"]');
+        if (pages.length > 0) {
+          let currentPage = null;
+          let currentIndex = -1;
+          
+          pages.forEach((page, index) => {
+            if (page.style.display !== 'none') {
+              currentPage = page;
+              currentIndex = index;
+            }
+          });
+          
+          if (currentPage && currentIndex >= 0) {
+            currentPage.style.display = 'none';
+            const nextIndex = (currentIndex + 1) % pages.length;
+            pages[nextIndex].style.display = 'block';
+          }
+        }
+      });
+    });
+
+    // Add PrevPage functionality
+    const prevPageButtons = document.querySelectorAll('.PrevPage, .prevPage');
+    prevPageButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const pages = document.querySelectorAll('[id^="page"]');
+        if (pages.length > 0) {
+          let currentPage = null;
+          let currentIndex = -1;
+          
+          pages.forEach((page, index) => {
+            if (page.style.display !== 'none') {
+              currentPage = page;
+              currentIndex = index;
+            }
+          });
+          
+          if (currentPage && currentIndex >= 0) {
+            currentPage.style.display = 'none';
+            const prevIndex = (currentIndex - 1 + pages.length) % pages.length;
+            pages[prevIndex].style.display = 'block';
+          }
+        }
+      });
+    });
+
+    // Add Submit functionality
+    const submitButtons = document.querySelectorAll('.Submit, .submit');
+    submitButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const formData = collectFormData();
+        // Send data to parent window
+        if (window.parent) {
+          window.parent.postMessage(JSON.stringify({
+            response: formData
+          }), '*');
+        }
+      });
+    });
+
+    // Initialize page visibility - show first page, hide others
+    const pages = document.querySelectorAll('[id^="page"]');
+    if (pages.length > 0) {
+      pages.forEach((page, index) => {
+        if (index === 0) {
+          page.style.display = 'block';
+        } else {
+          page.style.display = 'none';
+        }
+      });
+    }
+  });
+})();
+</script>`;
+
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -209,6 +380,7 @@ export class HTMLProcessor {
 </head>
 <body>
     ${modifiedHtml}
+    ${injectedScript}
 </body>
 </html>`;
   }

@@ -209,10 +209,22 @@ export class UserDataManager {
     
     await this.removeAccessToken(serverUrl);
     
-    if (typeof window.connectWebSocket === 'function') {
-      window.connectWebSocket(serverUrl);
-    } else {
-      console.error('connectWebSocket function not available');
+    // Try to connect using WebSocketManagerService from service registry
+    try {
+      // Import service registry dynamically to avoid circular dependencies
+      const { serviceRegistry } = await import('../services/registry');
+      
+      if (serviceRegistry.has('websocketManager')) {
+        const websocketManager = serviceRegistry.get<any>('websocketManager');
+        if (websocketManager && typeof websocketManager.connect === 'function') {
+          websocketManager.connect(serverUrl);
+          return true;
+        }
+      }
+      
+      console.error('WebSocketManagerService not available in service registry');
+    } catch (error) {
+      console.error('Error connecting to server after registration:', error);
     }
     
     return true;
@@ -264,5 +276,3 @@ export class UserDataManager {
     return await this.set('config', mergedConfig);
   }
 }
-
-window.userDataManager = new UserDataManager();

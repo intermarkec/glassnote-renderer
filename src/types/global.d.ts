@@ -2,13 +2,36 @@ export {}
 
 declare global {
   interface Window {
-    // Global configuration
-    config: any
-    appVersion: string
-    uuid: string
-    userStatus: string
-    is_screen_available: boolean
-    is_user_present: boolean
+    // Platform detection (essential for platform-specific code)
+    AndroidBridge?: {
+      postMessage: (message: string) => void
+      setIgnoreEventsTrue: () => void
+      setIgnoreEventsFalse: () => void
+      openExternal?: (url: string) => void
+    }
+
+    // Legacy compatibility during migration (marked as optional)
+    // These will be removed after full migration
+    connectWebSocket?: (url: string) => Promise<void>
+    getConnectionStatus?: (url: string) => any
+    getAllConnectionsStatus?: () => any
+    forceReconnect?: (url: string) => void
+    handleNetworkRestored?: () => void
+    Glass?: any
+    playGlassSound?: () => void
+    playQueueSound?: () => void
+    userDataManager?: any
+    electronAPI?: any
+    websocketManager?: any
+    glassSystem?: any
+    
+    // Essential state that may remain temporarily
+    config?: any
+    appVersion?: string
+    uuid?: string
+    userStatus?: string
+    is_screen_available?: boolean
+    is_user_present?: boolean
     activeConnections: Map<string, WebSocket>
     reconnectTimers: Map<string, NodeJS.Timeout>
     pingTimers: Map<string, NodeJS.Timeout>
@@ -23,115 +46,40 @@ declare global {
     servers: string[]
     certificateFailures: Map<string, number>
     connectingServers: Map<string, boolean>
-    
-    // Global functions
-    appInit: () => void
-    setKeycodeText: (text: string) => void
+
+    // Utility functions that may be used before services are initialized
     getURLParameter: (name: string) => string | null
-    handleScreenEvent: (event: string) => void
-    showConfigMenu: () => void
-    showSplash: () => void
-    removeFromUnifiedQueue: (messageId: string) => void
-    toggleConfigMenu: (view?: string) => void
-    connectWebSocket: (url: string) => Promise<void>
-    getConnectionStatus: (url: string) => any
-    getAllConnectionsStatus: () => any
-    forceReconnect: (url: string) => void
-    handleNetworkRestored: () => void
-    
-    // WebSocket manager
-    websocketManager: any
-    handleWebSocketMessage: (url: string, event: MessageEvent) => Promise<void>
-    _handleWebSocketMessage?: (url: string, event: MessageEvent) => Promise<void>
-    _originalHandleWebSocketMessage?: (url: string, event: MessageEvent) => Promise<void>
-    
-    // Glass system
-    glassSystem: any
-    Glass: any
-    
-    // Electron API
-    electronAPI?: {
-      receive: (channel: string, callback: (data: any) => void) => void
-      send: (channel: string, data?: any) => void
-      getUserData: (key: string, nestedKey?: string) => Promise<any>
-      setUserData: (key: string, nestedKey?: string, value?: any) => Promise<void>
-      removeUserData: (key: string, nestedKey?: string) => Promise<void>
-      openExternal: (url: string) => void
-      openExternalBrowser: (url: string) => void
-      openRegistrationWindow: (url: string) => void
-      showWindow: () => void
-      hideWindow: () => void
-      getOSInfo: () => any
-    }
-    
-    // Android Bridge
-    AndroidBridge?: {
-      postMessage: (message: string) => void
-      setIgnoreEventsTrue: () => void
-      setIgnoreEventsFalse: () => void
-      openExternal?: (url: string) => void
-    }
-    
-    // User data manager
-    userDataManager?: {
-      getServers: () => Promise<string[]>
-      getUUID: () => Promise<string>
-      getAccessTokens: () => Promise<Record<string, string>>
-      getRefreshTokens: () => Promise<Record<string, string>>
-      getRefreshTokenHash: (url: string) => Promise<string | null>
-      setAccessToken: (url: string, token: string) => Promise<boolean>
-      setRefreshToken: (url: string, token: string) => Promise<boolean>
-      setRefreshTokenHash: (url: string, hash: string) => Promise<boolean>
-      removeAccessToken: (url: string) => Promise<boolean>
-      removeRefreshToken: (url: string) => Promise<boolean>
-      removeServer: (url: string) => Promise<boolean>
-      get: (key: string, nestedKey?: string) => Promise<any>
-      set: (key: string, nestedKey: string | any, value?: any) => Promise<boolean>
-      remove: (key: string, nestedKey?: string) => Promise<boolean>
-      addServer: (serverUrl: string) => Promise<boolean>
-      handleRegistrationResponse: (serverUrl: string, refreshToken: string, refreshTokenHash?: string) => Promise<boolean>
-      getConfig: () => Promise<any>
-      setConfig: (config: any) => Promise<boolean>
-      generateUUID: () => string
-    }
-    
-    // Config menu
-    _configMenuInstance?: import('../systems/config-menu/config-menu').ConfigMenu
+    getPlatformContext: () => 'android' | 'electron' | 'browser'
+    isBrowserMode: () => boolean
+    isElectronMode: () => boolean
+    isAndroidMode: () => boolean
+
+    // Properties used in dom-events.ts and other files
+    handleScreenEvent?: (event: string) => void
+    removeFromUnifiedQueue?: (messageId: string) => void
+    rendererVersion?: string
+    showSplash?: () => void
+    _configMenuInstance?: any
     ConfigMenu?: any
-    
-    // Compatibility
-    compatibilityLoaded?: boolean
-    
-    // Sound functions
-    playQueueSound?: () => void
-    
-    // Window visibility
+    toggleConfigMenu?: (view?: string) => void
+    showConfigMenu?: () => void
+    initializeElectronHandlers?: () => void
+    passthroughManager?: {
+      setPassthrough: (ignore: boolean) => void
+    }
     checkWindowVisibility?: () => void
-    
-    // Network monitoring
+
+    // Additional properties found in TypeScript errors
     startNetworkMonitoring?: () => void
     startConnectionHealthMonitoring?: () => void
     startWebSocketHealthMonitoring?: () => void
-    
-    // Duplicate message detection
-    isDuplicateMessage?: (messageId: string, position: string) => boolean
-    
-    // Renderer version
-    rendererVersion?: string
-    
-    // Electron handlers
-    initializeElectronHandlers?: () => void
-    
-    // Registration functions and variables
-    REGISTRATION_SERVER_URL?: string
-    generateUUID?: () => string
+    appInit?: () => void
+    _handleWebSocketMessage?: (url: string, event: MessageEvent) => Promise<void>
+    _originalHandleWebSocketMessage?: (url: string, event: MessageEvent) => Promise<void>
     requestRegistrationCode?: () => void
     closeRegistrationConnection?: () => void
     handleRegisterButtonClick?: () => void
     positionRegisterButtonBelowKeycode?: () => void
-    
-    // Glass system
-    Glass?: any
     FileLoader?: any
     PositionManager?: any
     ScaleCalculator?: any
@@ -139,16 +87,17 @@ declare global {
     SVGProcessor?: any
     ImageProcessor?: any
     ConfirmationButton?: any
-    
-    // Sound system
     audioInstances?: Record<string, HTMLAudioElement>
     playSound?: (soundType: string) => void
     stopSound?: (soundType: string) => void
-    playGlassSound?: () => void
-    playQueueSound?: () => void
-    
-    // Glass utilities
     getActiveGlassesStatus?: () => any
     cleanupGhostGlasses?: () => number
+    isDuplicateMessage?: (messageId: string, position: string) => boolean
+    compatibilityLoaded?: boolean
+    
+    // Registration system properties
+    REGISTRATION_SERVER_URL?: string
+    generateUUID?: () => string
+    setKeycodeText?: (text: string) => void
   }
 }
