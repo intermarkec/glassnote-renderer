@@ -9,6 +9,8 @@ interface InteractiveElement {
   getElement: () => HTMLElement | null;
   priority: number;
   lastBounds: DOMRect | null;
+  isIframe?: boolean;
+  iframeWindow?: Window | null;
 }
 
 /**
@@ -24,6 +26,8 @@ export class PassthroughService extends BaseService {
   private lastMousePosition: { x: number; y: number } | null = null;
   private isMonitoring: boolean = false;
   private readonly CHECK_INTERVAL_MS = 300;
+  private isMouseOverIframe: boolean = false;
+  private currentIframeId: string | null = null;
 
   private constructor() {
     super('passthrough');
@@ -59,8 +63,9 @@ export class PassthroughService extends BaseService {
    * @param id Unique identifier for the element
    * @param getElement Function that returns the element (or null if not available)
    * @param priority Priority for overlapping elements (higher = more important)
+   * @param isIframe Whether this element is an iframe (needs special handling)
    */
-  public registerElement(id: string, getElement: () => HTMLElement | null, priority: number = 50): void {
+  public registerElement(id: string, getElement: () => HTMLElement | null, priority: number = 50, isIframe: boolean = false): void {
     if (this.elements.has(id)) {
       console.warn(`PassthroughService: Element with id "${id}" is already registered`);
       return;
@@ -70,14 +75,21 @@ export class PassthroughService extends BaseService {
       id,
       getElement,
       priority,
-      lastBounds: null
+      lastBounds: null,
+      isIframe,
+      iframeWindow: null
     };
 
     this.elements.set(id, element);
-    console.log(`PassthroughService: Registered element "${id}" with priority ${priority}`);
+    console.log(`PassthroughService: Registered element "${id}" with priority ${priority}, isIframe: ${isIframe}`);
     
     // Update bounds immediately
     this.updateElementBounds(id);
+    
+    // Setup iframe event listeners if needed
+    if (isIframe) {
+      this.setupIframeEventListeners(id);
+    }
     
     // Recalculate passthrough state
     this.checkAndUpdatePassthrough();
@@ -216,15 +228,21 @@ export class PassthroughService extends BaseService {
   }
 
   /**
-   * Check if mouse is over any registered element
+   * Check if mouse is over any registered element (including iframes)
    * @returns True if mouse is over an interactive element
    */
   private isMouseOverElement(): boolean {
-    if (!this.lastMousePosition) {
+    if (!this.lastMousePosition && !this.isMouseOverIframe) {
       return false;
     }
 
-    const { x, y } = this.lastMousePosition;
+    // If mouse is over an iframe (detected via iframe events)
+    if (this.isMouseOverIframe && this.currentIframeId) {
+      return true;
+    }
+
+    // Check regular elements
+    const { x, y } = this.lastMousePosition || { x: 0, y: 0 };
     let highestPriorityElement: InteractiveElement | null = null;
 
     // Check all elements
@@ -312,6 +330,72 @@ export class PassthroughService extends BaseService {
    */
   public getRegisteredElementIds(): string[] {
     return Array.from(this.elements.keys());
+  }
+
+  /**
+   * Setup event listeners for iframe elements
+   * @param id Element identifier
+   */
+  private setupIframeEventListeners(id: string): void {
+    const elementInfo = this.elements.get(id);
+    if (!elementInfo || !elementInfo.isIframe) {
+      return;
+    }
+
+    const element = elementInfo.getElement();
+    if (!element || !(element instanceof HTMLIFrameElement)) {
+      return;
+    }
+
+    const iframe = element as HTMLIFrameElement;
+    
+    // Try to access iframe content after it loads
+    const setupIframeEvents = () => {
+      try {
+        if (iframe.contentWindow && iframe.contentDocument) {
+          elementInfo.iframeWindow = iframe.contentWindow;
+          
+          // Add mouse event listeners inside the iframe
+          iframe.contentDocument.addEventListener('mousemove', (event) => {
+            // Convert iframe coordinates to parent window coordinates
+            const rect = iframe.getBoundingClientRect();
+            this.lastMousePosition = {
+              x: rect.left + event.clientX,
+              y: rect.top + event.clientY
+            };
+            
+            // Mark that mouse is over iframe
+            this.isMouseOverIframe = true;
+            this.currentIframeId = id;
+            
+            // Update passthrough immediately
+            this.checkAndUpdatePassthrough();
+          }, { capture: true });
+
+          iframe.contentDocument.addEventListener('mouseleave', () => {
+            this.isMouseOverIframe = false;
+            this.currentIframeId = null;
+            this.checkAndUpdatePassthrough();
+          }, { capture: true });
+
+          console.log(`PassthroughService: Setup iframe event listeners for "${id}"`);
+        }
+      } catch (error) {
+        // Cross-origin iframe - can't access content
+        console.warn(`PassthroughService: Cannot access iframe content for "${id}" (cross-origin):`, error);
+        
+        // Fallback: use iframe element bounds only
+        // This will work for mouse entering/leaving the iframe container
+        // but not for movements inside the iframe
+      }
+    };
+
+    // Wait for iframe to load
+    if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+      setupIframeEvents();
+    } else {
+      iframe.addEventListener('load', setupIframeEvents);
+    }
   }
 }
 

@@ -468,7 +468,8 @@ export class HTMLProcessor {
       this.passthroughService.registerElement(
         iframeId,
         () => iframe as HTMLElement,
-        80
+        80,
+        true // isIframe: true - this is an iframe element
       );
     }
   }

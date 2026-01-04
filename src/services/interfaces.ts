@@ -174,8 +174,9 @@ export interface IPassthroughService {
    * @param id Unique identifier for the element
    * @param getElement Function that returns the element (or null if not available)
    * @param priority Priority for overlapping elements (higher = more important)
+   * @param isIframe Whether this element is an iframe (needs special handling)
    */
-  registerElement(id: string, getElement: () => HTMLElement | null, priority?: number): void;
+  registerElement(id: string, getElement: () => HTMLElement | null, priority?: number, isIframe?: boolean): void;
   
   /**
    * Unregister an interactive element

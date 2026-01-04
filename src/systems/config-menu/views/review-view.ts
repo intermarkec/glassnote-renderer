@@ -202,7 +202,7 @@ export class ReviewView {
     this.container.innerHTML = `
       <div class="loading-state">
         <h2 class="review-title">Ultimos glasses recibidos</h2>
-        <p>Loading transactions from ${serverCount} server(s)...</p>
+        <p>Cargando mensajes: ${serverCount} servers conectados...</p>
       </div>
     `;
   }
