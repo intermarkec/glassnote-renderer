@@ -47,7 +47,7 @@ export class PassthroughService extends BaseService {
    * Service-specific initialization
    */
   protected async onInitialize(): Promise<void> {
-    console.log('PassthroughService: Initializing');
+    // console.log('PassthroughService: Initializing');
     
     // Set up mouse move listener to track position
     this.setupMouseTracking();
@@ -55,7 +55,7 @@ export class PassthroughService extends BaseService {
     // Start monitoring
     this.startMonitoring();
     
-    console.log('PassthroughService: Initialized successfully');
+    // console.log('PassthroughService: Initialized successfully');
   }
 
   /**
@@ -67,7 +67,7 @@ export class PassthroughService extends BaseService {
    */
   public registerElement(id: string, getElement: () => HTMLElement | null, priority: number = 50, isIframe: boolean = false): void {
     if (this.elements.has(id)) {
-      console.warn(`PassthroughService: Element with id "${id}" is already registered`);
+      // console.warn(`PassthroughService: Element with id "${id}" is already registered`);
       return;
     }
 
@@ -81,7 +81,7 @@ export class PassthroughService extends BaseService {
     };
 
     this.elements.set(id, element);
-    console.log(`PassthroughService: Registered element "${id}" with priority ${priority}, isIframe: ${isIframe}`);
+    // console.log(`PassthroughService: Registered element "${id}" with priority ${priority}, isIframe: ${isIframe}`);
     
     // Update bounds immediately
     this.updateElementBounds(id);
@@ -101,7 +101,7 @@ export class PassthroughService extends BaseService {
    */
   public unregisterElement(id: string): void {
     if (this.elements.delete(id)) {
-      console.log(`PassthroughService: Unregistered element "${id}"`);
+      // console.log(`PassthroughService: Unregistered element "${id}"`);
       
       // Recalculate passthrough state
       this.checkAndUpdatePassthrough();
@@ -139,7 +139,7 @@ export class PassthroughService extends BaseService {
       this.checkAndUpdatePassthrough();
     }, this.CHECK_INTERVAL_MS);
 
-    console.log('PassthroughService: Started monitoring');
+    // console.log('PassthroughService: Started monitoring');
   }
 
   /**
@@ -157,7 +157,7 @@ export class PassthroughService extends BaseService {
       this.checkInterval = null;
     }
 
-    console.log('PassthroughService: Stopped monitoring');
+    // console.log('PassthroughService: Stopped monitoring');
   }
 
   /**
@@ -191,7 +191,7 @@ export class PassthroughService extends BaseService {
     // Re-enable passthrough when cleaning up
     this.setPassthrough(true);
     
-    console.log('PassthroughService: Cleaned up');
+    // console.log('PassthroughService: Cleaned up');
   }
 
   /**
@@ -297,7 +297,8 @@ export class PassthroughService extends BaseService {
    * Apply passthrough state to the window
    */
   private applyPassthroughState(): void {
-    console.log(`PassthroughService: Setting passthrough to ${this.isPassthroughEnabled ? 'enabled' : 'disabled'}`);
+    // Only log when debugging is needed
+    // console.log(`PassthroughService: Setting passthrough to ${this.isPassthroughEnabled ? 'enabled' : 'disabled'}`);
     
     // Use Electron bridge if available
     if (window.electronAPI) {
@@ -378,7 +379,7 @@ export class PassthroughService extends BaseService {
             this.checkAndUpdatePassthrough();
           }, { capture: true });
 
-          console.log(`PassthroughService: Setup iframe event listeners for "${id}"`);
+          // console.log(`PassthroughService: Setup iframe event listeners for "${id}"`);
         }
       } catch (error) {
         // Cross-origin iframe - can't access content

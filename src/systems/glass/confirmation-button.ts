@@ -88,7 +88,7 @@ export class ConfirmationButton {
       60 // Lower priority for confirmation buttons
     );
     
-    console.log(`ConfirmationButton: Registered button as "${this.buttonElementId}"`);
+    // console.log(`ConfirmationButton: Registered button as "${this.buttonElementId}"`);
   }
 
   private _unregisterButtonFromService(): void {

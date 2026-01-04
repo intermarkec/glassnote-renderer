@@ -49,7 +49,7 @@ export class PassthroughManager {
       100 // High priority for config menu
     );
     
-    console.log(`PassthroughManager: Registered container as "${this.elementId}"`);
+    // console.log(`PassthroughManager: Registered container as "${this.elementId}"`);
   }
 
   /**
@@ -102,7 +102,7 @@ export class PassthroughManager {
     // Re-enable passthrough when cleaning up (menu is closing)
     this.setPassthrough(true);
     
-    console.log('PassthroughManager: Cleaned up');
+    // console.log('PassthroughManager: Cleaned up');
   }
 
   /**

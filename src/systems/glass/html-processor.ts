@@ -459,7 +459,7 @@ export class HTMLProcessor {
       80 // Medium priority for forms
     );
     
-    console.log(`HTMLProcessor: Registered form as "${this.formElementId}"`);
+    // console.log(`HTMLProcessor: Registered form as "${this.formElementId}"`);
     
     // Also register the iframe if it exists
     const iframe = glassContent.querySelector('iframe');

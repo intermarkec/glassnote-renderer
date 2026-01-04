@@ -21,7 +21,7 @@ export class WindowVisibilityService extends BaseService implements IWindowVisib
   protected async onInitialize(): Promise<void> {
     // Determine platform context
     this.platformContext = this.detectPlatformContext();
-    console.log(`WindowVisibilityService initialized for ${this.platformContext} platform`);
+    // console.log(`WindowVisibilityService initialized for ${this.platformContext} platform`);
   }
 
   /**
@@ -97,21 +97,21 @@ export class WindowVisibilityService extends BaseService implements IWindowVisib
    * and show/hide accordingly
    */
   checkWindowVisibility(): void {
-    console.log('WindowVisibilityService: checkWindowVisibility called, current windowVisible:', this.windowVisible);
+    // console.log('WindowVisibilityService: checkWindowVisibility called, current windowVisible:', this.windowVisible);
     
     // Determine if window should be visible based on application state
     const shouldBeVisible = this.shouldWindowBeVisible();
     
-    console.log('WindowVisibilityService: shouldBeVisible:', shouldBeVisible, 'windowVisible:', this.windowVisible);
+    // console.log('WindowVisibilityService: shouldBeVisible:', shouldBeVisible, 'windowVisible:', this.windowVisible);
     
     if (shouldBeVisible && !this.windowVisible) {
-      console.log('WindowVisibilityService: Showing window (shouldBeVisible=true, windowVisible=false)');
+      // console.log('WindowVisibilityService: Showing window (shouldBeVisible=true, windowVisible=false)');
       this.showWindow();
     } else if (!shouldBeVisible && this.windowVisible) {
-      console.log('WindowVisibilityService: Hiding window (shouldBeVisible=false, windowVisible=true)');
+      // console.log('WindowVisibilityService: Hiding window (shouldBeVisible=false, windowVisible=true)');
       this.hideWindow();
     } else {
-      console.log('WindowVisibilityService: No action needed (shouldBeVisible:', shouldBeVisible, 'windowVisible:', this.windowVisible, ')');
+      // console.log('WindowVisibilityService: No action needed (shouldBeVisible:', shouldBeVisible, 'windowVisible:', this.windowVisible, ')');
     }
   }
 
@@ -128,13 +128,13 @@ export class WindowVisibilityService extends BaseService implements IWindowVisib
   private shouldWindowBeVisible(): boolean {
     // Check if there are active glasses that require window visibility
     if (window.activeGlasses && window.activeGlasses.size > 0) {
-      console.log('WindowVisibilityService: shouldWindowBeVisible returning true - activeGlasses size:', window.activeGlasses.size);
+      // console.log('WindowVisibilityService: shouldWindowBeVisible returning true - activeGlasses size:', window.activeGlasses.size);
       return true;
     }
     
     // Check if there are glasses in the unified queue
     if (window.unifiedGlassQueue && window.unifiedGlassQueue.length > 0) {
-      console.log('WindowVisibilityService: shouldWindowBeVisible returning true - unifiedGlassQueue length:', window.unifiedGlassQueue.length);
+      // console.log('WindowVisibilityService: shouldWindowBeVisible returning true - unifiedGlassQueue length:', window.unifiedGlassQueue.length);
       return true;
     }
     
@@ -154,7 +154,7 @@ export class WindowVisibilityService extends BaseService implements IWindowVisib
                                        container.parentNode !== null;
         }
       } catch (error) {
-        console.error('WindowVisibilityService: Error checking config menu container visibility:', error);
+        // console.error('WindowVisibilityService: Error checking config menu container visibility:', error);
       }
     }
     
@@ -169,37 +169,37 @@ export class WindowVisibilityService extends BaseService implements IWindowVisib
             computedStyle.visibility !== 'hidden' &&
             element.parentNode !== null) {
           anyConfigMenuElementVisible = true;
-          console.log('WindowVisibilityService: Found visible config-menu element in DOM');
+          // console.log('WindowVisibilityService: Found visible config-menu element in DOM');
           break;
         }
       }
     } catch (error) {
-      console.error('WindowVisibilityService: Error checking for config-menu elements:', error);
+      // console.error('WindowVisibilityService: Error checking for config-menu elements:', error);
     }
     
     const configMenuVisible = configMenuVisibleByFlag || configMenuContainerVisible || anyConfigMenuElementVisible;
     
     if (configMenuVisible) {
-      console.log('WindowVisibilityService: shouldWindowBeVisible returning true - config menu is visible');
-      console.log('WindowVisibilityService: configMenuInstance exists:', configMenuInstanceExists,
-                  'isVisible flag:', configMenuVisibleByFlag,
-                  'container visible:', configMenuContainerVisible);
+      // console.log('WindowVisibilityService: shouldWindowBeVisible returning true - config menu is visible');
+      // console.log('WindowVisibilityService: configMenuInstance exists:', configMenuInstanceExists,
+      //             'isVisible flag:', configMenuVisibleByFlag,
+      //             'container visible:', configMenuContainerVisible);
       return true;
     } else {
-      console.log('WindowVisibilityService: config menu check - instance exists:', configMenuInstanceExists,
-                  'isVisible flag:', configMenuVisibleByFlag,
-                  'container visible:', configMenuContainerVisible);
+      // console.log('WindowVisibilityService: config menu check - instance exists:', configMenuInstanceExists,
+      //             'isVisible flag:', configMenuVisibleByFlag,
+      //             'container visible:', configMenuContainerVisible);
     }
     
     // Check if registration code is being displayed
     const keycodeElement = document.getElementById('keycode');
     const hasKeycode = keycodeElement && keycodeElement.textContent && keycodeElement.textContent.trim();
     if (hasKeycode) {
-      console.log('WindowVisibilityService: shouldWindowBeVisible returning true - registration code is displayed');
+      // console.log('WindowVisibilityService: shouldWindowBeVisible returning true - registration code is displayed');
       return true;
     }
     
-    console.log('WindowVisibilityService: shouldWindowBeVisible returning false - no reason to keep window visible');
+    // console.log('WindowVisibilityService: shouldWindowBeVisible returning false - no reason to keep window visible');
     return false;
   }
 
