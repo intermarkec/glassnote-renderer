@@ -323,25 +323,11 @@ class Glass {
   }
 }
 
-// Sound system for playing glass sounds
-class SoundSystem {
-  static playQueueSound(): void {
-    // In a real implementation, this would play the queue sound
-    console.log('Queue sound would play here')
-  }
-
-  static playGlassSound(): void {
-    // In a real implementation, this would play the glass sound
-    console.log('Glass sound would play here')
-  }
-}
-
 // Initialize global variables
 window.activeGlasses = window.activeGlasses || new Map()
 
 // Make classes globally available
 window.Glass = Glass as any
-window.playQueueSound = SoundSystem.playQueueSound
 
 // Duplicate message detection
 window.isDuplicateMessage = function(messageId: string, _position: string): boolean {
@@ -362,4 +348,4 @@ if (!window.checkWindowVisibility) {
 }
 
 // Export for use in other modules
-export { Glass, SoundSystem, FileLoader }
+export { Glass, FileLoader }
