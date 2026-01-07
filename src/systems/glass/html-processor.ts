@@ -268,6 +268,121 @@ export class HTMLProcessor {
     return items;
   }
 
+  // Timer management
+  const timerMap = new Map(); // Map to store timer timeouts
+  const timerElements = new Map(); // Map to store timer elements and their data
+
+  // Function to execute timer action
+  function executeTimerAction(timerElement) {
+    const action = timerElement.getAttribute('data-action');
+    if (!action) return;
+
+    // Execute the appropriate action
+    if (action === 'Submit') {
+      const formData = collectFormData();
+      if (window.parent) {
+        window.parent.postMessage(JSON.stringify({
+          response: formData,
+          timer: true
+        }), '*');
+      }
+    } else if (action === 'NextPage') {
+      const pages = document.querySelectorAll('[id^="page"]');
+      if (pages.length > 0) {
+        let currentPage = null;
+        let currentIndex = -1;
+        
+        pages.forEach((page, index) => {
+          if (page.style.display !== 'none') {
+            currentPage = page;
+            currentIndex = index;
+          }
+        });
+        
+        if (currentPage && currentIndex >= 0) {
+          currentPage.style.display = 'none';
+          const nextIndex = (currentIndex + 1) % pages.length;
+          pages[nextIndex].style.display = 'block';
+          // Update timers after page change
+          manageTimers();
+        }
+      }
+    } else if (action === 'PrevPage') {
+      const pages = document.querySelectorAll('[id^="page"]');
+      if (pages.length > 0) {
+        let currentPage = null;
+        let currentIndex = -1;
+        
+        pages.forEach((page, index) => {
+          if (page.style.display !== 'none') {
+            currentPage = page;
+            currentIndex = index;
+          }
+        });
+        
+        if (currentPage && currentIndex >= 0) {
+          currentPage.style.display = 'none';
+          const prevIndex = (currentIndex - 1 + pages.length) % pages.length;
+          pages[prevIndex].style.display = 'block';
+          // Update timers after page change
+          manageTimers();
+        }
+      }
+    }
+  }
+
+  // Function to start a timer
+  function startTimer(timerElement) {
+    const seconds = parseInt(timerElement.getAttribute('data-seconds') || '0');
+    if (seconds <= 0) return;
+
+    // Clear existing timer if any
+    stopTimer(timerElement);
+
+    // Start new timer
+    const timeoutId = setTimeout(() => {
+      executeTimerAction(timerElement);
+    }, seconds * 1000);
+
+    timerMap.set(timerElement, timeoutId);
+  }
+
+  // Function to stop a timer
+  function stopTimer(timerElement) {
+    if (timerMap.has(timerElement)) {
+      clearTimeout(timerMap.get(timerElement));
+      timerMap.delete(timerElement);
+    }
+  }
+
+  // Function to check if timer is in visible page
+  function isTimerInVisiblePage(timerElement) {
+    const pages = document.querySelectorAll('[id^="page"]');
+    for (const page of pages) {
+      if (page.style.display !== 'none' && page.contains(timerElement)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Function to manage all timers based on page visibility
+  function manageTimers() {
+    const allTimers = document.querySelectorAll('.timer');
+    
+    allTimers.forEach(timerElement => {
+      if (isTimerInVisiblePage(timerElement)) {
+        // Timer is in visible page, ensure it's running
+        if (!timerMap.has(timerElement)) {
+          startTimer(timerElement);
+        }
+      } else {
+        // Timer is not in visible page, stop it
+        stopTimer(timerElement);
+      }
+    });
+  }
+
   // Initialize functionality when DOM is ready
   document.addEventListener('DOMContentLoaded', function() {
     // Add toggle functionality
@@ -298,6 +413,8 @@ export class HTMLProcessor {
             currentPage.style.display = 'none';
             const nextIndex = (currentIndex + 1) % pages.length;
             pages[nextIndex].style.display = 'block';
+            // Update timers after page change
+            manageTimers();
           }
         }
       });
@@ -323,6 +440,8 @@ export class HTMLProcessor {
             currentPage.style.display = 'none';
             const prevIndex = (currentIndex - 1 + pages.length) % pages.length;
             pages[prevIndex].style.display = 'block';
+            // Update timers after page change
+            manageTimers();
           }
         }
       });
@@ -336,7 +455,8 @@ export class HTMLProcessor {
         // Send data to parent window
         if (window.parent) {
           window.parent.postMessage(JSON.stringify({
-            response: formData
+            response: formData,
+            submit: true
           }), '*');
         }
       });
@@ -353,6 +473,9 @@ export class HTMLProcessor {
         }
       });
     }
+
+    // Initialize timers after page setup
+    manageTimers();
   });
 })();
 </script>`;
@@ -554,7 +677,8 @@ export class HTMLProcessor {
         try {
           const messageData = JSON.parse(event.data);
           if (messageData.response) {
-            self.glass.formResponse = messageData.response;
+            // Store the entire message data to preserve timer/submit flags
+            self.glass.formResponse = messageData;
             // Clean up form registration before finishing
             self._unregisterFormFromService();
             self.glass.finishGlass();

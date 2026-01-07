@@ -37,6 +37,7 @@ class Glass {
   public isFinishing: boolean = false;
   public img: HTMLElement;
   public activeConnections: Map<string, WebSocket>;
+  public wasConfirmed: boolean = false;
 
   constructor(url: string | null, message: any) {
     this.url = url || ''
@@ -229,6 +230,10 @@ class Glass {
       const contentRect = glassContent.getBoundingClientRect()
       if (contentRect.width > 0 && contentRect.height > 0) {
         glassContent.style.opacity = this.message.data.transparency || '1'
+        // Send displayed notification after fade-in completes
+        setTimeout(() => {
+          this._sendNotification('displayed')
+        }, 1000) // Wait for fade-in transition to complete (1s)
       } else {
         requestAnimationFrame(startFadeIn)
       }
@@ -279,6 +284,22 @@ class Glass {
     }
   }
 
+  private _sendNotification(eventType: string, responseData?: any): void {
+    const ws = this.activeConnections.get(this.url);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const glassId = this.message.data.id;
+      const out = {
+        event: 'notify',
+        data: {
+          id: glassId,
+          event: eventType,
+          response: responseData || {}
+        }
+      };
+      ws.send(JSON.stringify(out));
+    }
+  }
+
   private _handleConfirmationButtonCleanup(): void {
     if (this.confirmButton) {
       this.confirmButton.cleanup();
@@ -292,6 +313,27 @@ class Glass {
 
   public cleanup(): void {
     console.log('Glass cleanup called for glass ID:', this.message?.data?.id, 'positionKey:', this.positionKey);
+    
+    // Prepare response data for SUCCESS notification
+    let responseData: any = {};
+    if (this.formResponse) {
+      // this.formResponse now contains the entire message from iframe
+      // which includes response (form data) and timer/submit flags
+      responseData.formData = this.formResponse.response;
+      // Copy timer or submit flags if present
+      if (this.formResponse.timer) {
+        responseData.timer = true;
+      }
+      if (this.formResponse.submit) {
+        responseData.submit = true;
+      }
+    }
+    if (this.wasConfirmed) {
+      responseData.confirmed = true;
+    }
+    
+    // Send success notification before cleanup
+    this._sendNotification('success', responseData)
     
     // Remove from unified queue when glass finishes displaying
     if (window.removeFromUnifiedQueue && this.message && this.message.data) {
@@ -337,6 +379,7 @@ class Glass {
     this.img = document.createElement('div'); // Resetear a elemento temporal
     this.isFinishing = false;
     this.confirmationCounted = false;
+    this.wasConfirmed = false;
 
     // Check window visibility
     console.log('Glass cleanup: Calling checkWindowVisibility()');

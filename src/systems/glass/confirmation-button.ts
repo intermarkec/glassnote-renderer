@@ -10,6 +10,7 @@ interface GlassInstance {
   url: string;
   activeConnections: Map<string, WebSocket>;
   img: HTMLElement;
+  wasConfirmed?: boolean;
 }
 
 export class ConfirmationButton {
@@ -321,28 +322,11 @@ export class ConfirmationButton {
     this.button.style.opacity = '0.5';
     this.button.style.cursor = 'default';
     
-    this._sendConfirmationResponse();
-    this.glass.finishGlass();
-  }
-
-  private _sendConfirmationResponse(): void {
-    if (this.isDestroyed) {
-      return;
-    }
+    // Mark glass as confirmed
+    this.glass.wasConfirmed = true;
     
-    const ws = this.glass.activeConnections.get(this.glass.url);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      const glassId = (this.glass.img as any).glass_id;
-      const out = {
-        event: 'notify',
-        data: {
-          id: glassId,
-          event: 'success',
-          response: { confirmed: true }
-        }
-      };
-      ws.send(JSON.stringify(out));
-    }
+    // No longer send confirmation response here - Glass class will handle it in cleanup
+    this.glass.finishGlass();
   }
 
   cleanup(): void {
