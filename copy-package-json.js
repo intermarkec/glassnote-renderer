@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -28,6 +28,22 @@ try {
   // Write to dist folder
   const distPath = join(distDir, 'package.json');
   writeFileSync(distPath, JSON.stringify(reducedPackage, null, 2), 'utf8');
+  
+  // Copy index.html as glassnote.html for compatibility
+  const indexPath = join(distDir, 'index.html');
+  const glassnotePath = join(distDir, 'glassnote.html');
+  
+  try {
+    if (existsSync(indexPath)) {
+      copyFileSync(indexPath, glassnotePath);
+      console.log('Copied index.html to glassnote.html for compatibility');
+    } else {
+      console.warn('Warning: index.html not found in dist folder');
+      console.warn('This may happen if Vite build failed or the file has a different name');
+    }
+  } catch (copyError) {
+    console.warn('Warning: Could not copy index.html to glassnote.html:', copyError.message);
+  }
   
   console.log('Reduced package.json copied to dist folder with version:', packageJson.version);
 } catch (error) {
