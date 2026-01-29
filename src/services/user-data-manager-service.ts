@@ -43,9 +43,14 @@ export class UserDataManagerService extends BaseService implements IUserDataMana
   async set(key: string, nestedKey: string | any, value?: any): Promise<boolean> {
     try {
       if (typeof nestedKey === 'string' && value !== undefined) {
+        // Set nested value: key, nestedKey, value
         await (window as any).electronAPI?.setUserData(key, nestedKey, value);
+      } else if (value === undefined) {
+        // Set entire object at key: key, value (where nestedKey is actually the value)
+        await (window as any).electronAPI?.setUserData(key, undefined, nestedKey);
       } else {
-        await (window as any).electronAPI?.setUserData(key, nestedKey);
+        // This shouldn't happen, but fallback
+        await (window as any).electronAPI?.setUserData(key, nestedKey, value);
       }
       return true;
     } catch (error) {

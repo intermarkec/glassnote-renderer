@@ -250,6 +250,7 @@ async function handleRegistrationResponse(response: any): Promise<void> {
       const refreshToken = response.data.refreshToken;
       const refreshTokenHash = response.data.refreshTokenHash;
       
+      
       // Save server using userDataManager from service registry
       try {
         if ((window as any).serviceRegistry) {
