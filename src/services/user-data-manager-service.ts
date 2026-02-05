@@ -1,5 +1,6 @@
 import { BaseService } from './base-service';
 import { IUserDataManager } from './interfaces';
+import { serviceRegistry } from './registry';
 
 /**
  * User Data Manager Service
@@ -256,6 +257,18 @@ export class UserDataManagerService extends BaseService implements IUserDataMana
       
       if (refreshTokenHash) {
         await this.setRefreshTokenHash(serverUrl, refreshTokenHash);
+      }
+      
+      await this.removeAccessToken(serverUrl);
+      
+      // Try to connect using WebSocketManagerService from service registry
+      if (serviceRegistry.has('websocketManager')) {
+        const websocketManager = serviceRegistry.get<any>('websocketManager');
+        if (websocketManager && typeof websocketManager.connect === 'function') {
+          websocketManager.connect(serverUrl);
+        }
+      } else {
+        console.error('WebSocketManagerService not available in service registry');
       }
       
       return true;
