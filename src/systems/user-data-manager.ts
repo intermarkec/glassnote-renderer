@@ -142,13 +142,24 @@ export class UserDataManager {
       return {};
     }
     
-    if (typeof tokens === 'object' && !Array.isArray(tokens)) {
+    // Handle corrupted data: if tokens is an array, convert to empty object
+    if (Array.isArray(tokens)) {
+      console.warn('Refresh tokens stored as array instead of object, returning empty object');
+      return {};
+    }
+    
+    if (typeof tokens === 'object') {
       return tokens;
     }
     
     if (typeof tokens === 'string') {
       try {
         const parsedTokens = JSON.parse(tokens);
+        // Also check if parsed result is an array
+        if (Array.isArray(parsedTokens)) {
+          console.warn('Refresh tokens parsed as array from JSON string, returning empty object');
+          return {};
+        }
         return parsedTokens;
       } catch (parseError) {
         console.error('DEBUG getRefreshTokens - failed to parse as JSON, treating as single token');
@@ -171,7 +182,19 @@ export class UserDataManager {
 
   async getAccessTokens(): Promise<Record<string, string>> {
     const tokens = await this.get('accessTokens');
-    return tokens && typeof tokens === 'object' ? tokens : {};
+    
+    // Handle corrupted data: if tokens is an array, convert to empty object
+    if (Array.isArray(tokens)) {
+      console.warn('Access tokens stored as array instead of object, returning empty object');
+      return {};
+    }
+    
+    // If it's not an object or is null/undefined, return empty object
+    if (!tokens || typeof tokens !== 'object') {
+      return {};
+    }
+    
+    return tokens;
   }
 
   async setAccessToken(serverUrl: string, accessToken: string): Promise<boolean> {
@@ -233,19 +256,38 @@ export class UserDataManager {
   async getUUID(): Promise<string> {
     if (window.getURLParameter) {
       const uuidFromURL = window.getURLParameter('uuid');
-      if (uuidFromURL) {
+      if (uuidFromURL && !this.isInvalidUUID(uuidFromURL)) {
         return uuidFromURL;
       }
     }
     
     const storedUUID = await this.get('uuid');
-    if (storedUUID) {
+    if (storedUUID && !this.isInvalidUUID(storedUUID)) {
       return storedUUID;
     }
     
     const newUUID = this.generateUUID();
     await this.set('uuid', newUUID);
     return newUUID;
+  }
+
+  private isInvalidUUID(uuid: string): boolean {
+    // Check if it's a string
+    if (typeof uuid !== 'string') {
+      return true;
+    }
+    
+    // Check for common invalid patterns
+    if (uuid.includes(',') ||
+        uuid.includes(' ') ||
+        uuid.includes('://') ||
+        uuid.includes('ws://') ||
+        uuid.includes('wss://') ||
+        uuid.length > 100) { // UUIDs should be relatively short
+      return true;
+    }
+    
+    return false;
   }
 
   generateUUID(): string {

@@ -124,7 +124,19 @@ export class UserDataManagerService extends BaseService implements IUserDataMana
   async getRefreshTokens(): Promise<Record<string, string>> {
     try {
       const tokens = await this.get('refreshTokens');
-      return tokens || {};
+      
+      // Handle corrupted data: if tokens is an array, convert to empty object
+      if (Array.isArray(tokens)) {
+        console.warn('Refresh tokens stored as array instead of object, returning empty object');
+        return {};
+      }
+      
+      // If it's not an object or is null/undefined, return empty object
+      if (!tokens || typeof tokens !== 'object') {
+        return {};
+      }
+      
+      return tokens;
     } catch (error) {
       console.error('Error getting refresh tokens:', error);
       return {};
@@ -167,7 +179,19 @@ export class UserDataManagerService extends BaseService implements IUserDataMana
   async getAccessTokens(): Promise<Record<string, string>> {
     try {
       const tokens = await this.get('accessTokens');
-      return tokens || {};
+      
+      // Handle corrupted data: if tokens is an array, convert to empty object
+      if (Array.isArray(tokens)) {
+        console.warn('Access tokens stored as array instead of object, returning empty object');
+        return {};
+      }
+      
+      // If it's not an object or is null/undefined, return empty object
+      if (!tokens || typeof tokens !== 'object') {
+        return {};
+      }
+      
+      return tokens;
     } catch (error) {
       console.error('Error getting access tokens:', error);
       return {};
@@ -284,7 +308,9 @@ export class UserDataManagerService extends BaseService implements IUserDataMana
   async getUUID(): Promise<string> {
     try {
       let uuid = await this.get('uuid');
-      if (!uuid) {
+      
+      // Validate the UUID - it should not contain invalid characters
+      if (!uuid || this.isInvalidUUID(uuid)) {
         uuid = this.generateUUID();
         await this.set('uuid', uuid);
       }
@@ -293,6 +319,37 @@ export class UserDataManagerService extends BaseService implements IUserDataMana
       console.error('Error getting UUID:', error);
       return this.generateUUID();
     }
+  }
+
+  /**
+   * Check if a UUID is invalid (contains commas, URLs, or other invalid characters)
+   */
+  private isInvalidUUID(uuid: string): boolean {
+    // Check if it's a string
+    if (typeof uuid !== 'string') {
+      return true;
+    }
+    
+    // Check for common invalid patterns
+    if (uuid.includes(',') ||
+        uuid.includes(' ') ||
+        uuid.includes('://') ||
+        uuid.includes('ws://') ||
+        uuid.includes('wss://') ||
+        uuid.length > 100) { // UUIDs should be relatively short
+      return true;
+    }
+    
+    // Check if it looks like a standard UUID format (optional)
+    // Standard UUID format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(uuid)) {
+      // Not a standard UUID format, but might still be valid
+      // We'll be lenient and only reject obviously wrong ones
+      return false;
+    }
+    
+    return false;
   }
 
   /**

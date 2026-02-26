@@ -209,19 +209,51 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
           return 'refresh-' + refreshToken;
         } else {
           const uuid = await userDataManager.getUUID();
-          return 'uuid-' + uuid;
+          // Validate that the UUID is a valid WebSocket protocol
+          const validatedUUID = this.validateAndSanitizeUUID(uuid, userDataManager);
+          return 'uuid-' + validatedUUID;
         }
       }
     } catch (error) {
       console.error('Error getting tokens:', error);
       try {
         const uuid = await userDataManager.getUUID();
-        return 'uuid-' + uuid;
+        // Validate that the UUID is a valid WebSocket protocol
+        const validatedUUID = this.validateAndSanitizeUUID(uuid, userDataManager);
+        return 'uuid-' + validatedUUID;
       } catch (uuidError) {
         console.error('Error getting UUID:', uuidError);
         return null;
       }
     }
+  }
+
+  private validateAndSanitizeUUID(uuid: string, userDataManager: any): string {
+    // Check if the UUID contains invalid characters for a WebSocket protocol
+    // Invalid characters include: space, comma, colon, semicolon, etc.
+    // Specifically check for comma which was causing the error
+    if (uuid.includes(',') || uuid.includes(' ') || uuid.includes('://')) {
+      console.warn('Invalid UUID detected (contains invalid characters), generating new UUID:', uuid);
+      // Generate a new UUID
+      const newUUID = userDataManager.generateUUID();
+      // Store the new UUID for future use
+      userDataManager.set('uuid', newUUID).catch((error: any) => {
+        console.error('Error storing new UUID:', error);
+      });
+      return newUUID;
+    }
+    
+    // Also check if it looks like a URL list (contains ws:// or wss://)
+    if (uuid.includes('ws://') || uuid.includes('wss://')) {
+      console.warn('Invalid UUID detected (looks like URL list), generating new UUID:', uuid);
+      const newUUID = userDataManager.generateUUID();
+      userDataManager.set('uuid', newUUID).catch((error: any) => {
+        console.error('Error storing new UUID:', error);
+      });
+      return newUUID;
+    }
+    
+    return uuid;
   }
 
   private isTokenExpired(token: string): boolean {
