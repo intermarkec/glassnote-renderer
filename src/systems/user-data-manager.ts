@@ -254,20 +254,41 @@ export class UserDataManager {
   }
 
   async getUUID(): Promise<string> {
+    // CRITICAL FIX: Always trust window.uuid from Electron without validation
+    // Priority 1: UUID from window (set by Electron) - TRUSTED SOURCE
+    if (window.uuid && typeof window.uuid === 'string' && window.uuid.trim() !== '') {
+      console.log('user-data-manager.ts: Using UUID from window (Electron-provided, trusted):', window.uuid);
+      return window.uuid;
+    }
+    
+    // Priority 2: UUID from URL parameter (also from Electron) - also trusted
     if (window.getURLParameter) {
       const uuidFromURL = window.getURLParameter('uuid');
-      if (uuidFromURL && !this.isInvalidUUID(uuidFromURL)) {
+      if (uuidFromURL && uuidFromURL.trim() !== '') {
+        console.log('user-data-manager.ts: Using UUID from URL parameter (trusted):', uuidFromURL);
         return uuidFromURL;
       }
     }
     
+    // Priority 3: UUID from stored data (only if not from Electron)
     const storedUUID = await this.get('uuid');
-    if (storedUUID && !this.isInvalidUUID(storedUUID)) {
+    if (storedUUID && typeof storedUUID === 'string' && storedUUID.trim() !== '') {
+      console.log('user-data-manager.ts: Using stored UUID:', storedUUID);
       return storedUUID;
     }
     
+    // Priority 4: Legacy UUID from localStorage
+    const legacyUUID = localStorage.getItem('device_uuid');
+    if (legacyUUID && !this.isInvalidUUID(legacyUUID)) {
+      console.log('user-data-manager.ts: Using legacy UUID from localStorage:', legacyUUID);
+      return legacyUUID;
+    }
+    
+    // Last resort: Generate temporary UUID but DO NOT persist it
+    // UUID should only be set by Electron main process
+    console.warn('user-data-manager.ts: No valid UUID found, generating temporary one (will not be persisted)');
     const newUUID = this.generateUUID();
-    await this.set('uuid', newUUID);
+    // DO NOT call this.set('uuid', newUUID) - UUID should only be set by Electron
     return newUUID;
   }
 

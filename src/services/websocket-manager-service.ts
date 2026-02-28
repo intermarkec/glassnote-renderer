@@ -229,28 +229,45 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
   }
 
   private validateAndSanitizeUUID(uuid: string, userDataManager: any): string {
+    // CRITICAL FIX: Always trust window.uuid from Electron first
+    // If we have a valid window.uuid from Electron, use it without validation
+    if (window.uuid && typeof window.uuid === 'string' && window.uuid.trim() !== '') {
+      console.log('validateAndSanitizeUUID(): Using trusted window.uuid from Electron:', window.uuid);
+      return window.uuid;
+    }
+    
     // Check if the UUID contains invalid characters for a WebSocket protocol
     // Invalid characters include: space, comma, colon, semicolon, etc.
     // Specifically check for comma which was causing the error
     if (uuid.includes(',') || uuid.includes(' ') || uuid.includes('://')) {
-      console.warn('Invalid UUID detected (contains invalid characters), generating new UUID:', uuid);
-      // Generate a new UUID
-      const newUUID = userDataManager.generateUUID();
-      // Store the new UUID for future use
-      userDataManager.set('uuid', newUUID).catch((error: any) => {
-        console.error('Error storing new UUID:', error);
-      });
-      return newUUID;
+      console.error('CRITICAL: Invalid UUID detected (contains invalid characters):', uuid);
+      console.error('This UUID came from:', window.uuid ? 'window.uuid' : 'userDataManager.getUUID()');
+      console.error('UUID should only come from Electron main process and be valid.');
+      
+      // Last resort: clean the UUID by removing invalid characters
+      // But DO NOT generate a new UUID - that would break synchronization with Electron
+      let cleanedUUID = uuid.replace(/[, :;/]/g, '');
+      if (cleanedUUID.length < 36) {
+        // If cleaning made it too short, use a fallback
+        cleanedUUID = 'invalid-uuid-fallback';
+      }
+      console.warn('Cleaned invalid UUID for WebSocket protocol:', cleanedUUID);
+      return cleanedUUID;
     }
     
     // Also check if it looks like a URL list (contains ws:// or wss://)
     if (uuid.includes('ws://') || uuid.includes('wss://')) {
-      console.warn('Invalid UUID detected (looks like URL list), generating new UUID:', uuid);
-      const newUUID = userDataManager.generateUUID();
-      userDataManager.set('uuid', newUUID).catch((error: any) => {
-        console.error('Error storing new UUID:', error);
-      });
-      return newUUID;
+      console.error('CRITICAL: UUID looks like URL list (should be a UUID):', uuid);
+      
+      // Extract potential UUID from the string (look for UUID pattern)
+      const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+      const match = uuid.match(uuidPattern);
+      if (match) {
+        console.warn('Extracted UUID from URL-like string:', match[0]);
+        return match[0];
+      }
+      
+      return 'invalid-uuid-url';
     }
     
     return uuid;

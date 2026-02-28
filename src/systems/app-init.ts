@@ -1,9 +1,15 @@
 // Application initialization system
 
 // Try to get UUID from URL first using utility function
+console.log('app-init.ts: Reading UUID from URL...');
+console.log('app-init.ts: window.location.search =', window.location.search);
 const uuidFromURL = window.getURLParameter ? window.getURLParameter('uuid') : null
+console.log('app-init.ts: uuidFromURL =', uuidFromURL);
 if (uuidFromURL) {
   window.uuid = uuidFromURL
+  console.log('app-init.ts: Set window.uuid =', window.uuid);
+} else {
+  console.warn('app-init.ts: No UUID found in URL parameters');
 }
 
 // Try to get version from URL query parameter (primary source for Electron version)

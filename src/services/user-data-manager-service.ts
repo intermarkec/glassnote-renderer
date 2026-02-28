@@ -304,19 +304,58 @@ export class UserDataManagerService extends BaseService implements IUserDataMana
 
   /**
    * Get UUID
+   * IMPORTANT: Always use the UUID provided by Electron main process
+   * Never generate a new UUID in the renderer
    */
   async getUUID(): Promise<string> {
     try {
+      console.log('getUUID(): Starting UUID retrieval...');
+      console.log('getUUID(): window.uuid =', window.uuid, '(type:', typeof window.uuid, ')');
+      
+      // CRITICAL FIX: Always use window.uuid if it exists (provided by Electron)
+      // Electron's UUID should be trusted without validation
+      if (window.uuid && typeof window.uuid === 'string' && window.uuid.trim() !== '') {
+        console.log('getUUID(): Using UUID from window (Electron-provided, trusted):', window.uuid);
+        return window.uuid;
+      }
+      
+      console.warn('getUUID(): window.uuid is not available, empty, or not a string');
+      
+      // Second, try to get UUID from stored data
       let uuid = await this.get('uuid');
       
       // Validate the UUID - it should not contain invalid characters
       if (!uuid || this.isInvalidUUID(uuid)) {
-        uuid = this.generateUUID();
-        await this.set('uuid', uuid);
+        // UUID is invalid or doesn't exist
+        // Instead of generating a new one, try to get it from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const uuidFromUrl = urlParams.get('uuid');
+        
+        if (uuidFromUrl && !this.isInvalidUUID(uuidFromUrl)) {
+          console.log('getUUID(): Using UUID from URL parameter:', uuidFromUrl);
+          uuid = uuidFromUrl;
+        } else {
+          // Last resort: check if we have a valid UUID in localStorage (legacy)
+          const legacyUUID = localStorage.getItem('device_uuid');
+          if (legacyUUID && !this.isInvalidUUID(legacyUUID)) {
+            console.log('getUUID(): Using legacy UUID from localStorage:', legacyUUID);
+            uuid = legacyUUID;
+          } else {
+            // Only generate as absolute last resort
+            console.warn('getUUID(): No valid UUID found, generating temporary one (will not be persisted)');
+            uuid = this.generateUUID();
+            // DO NOT call this.set('uuid', uuid) - UUID should only be set by Electron main process
+          }
+        }
       }
+      
       return uuid;
     } catch (error) {
       console.error('Error getting UUID:', error);
+      // Fallback to window.uuid or generate temporary UUID
+      if (window.uuid && typeof window.uuid === 'string') {
+        return window.uuid;
+      }
       return this.generateUUID();
     }
   }
@@ -325,18 +364,37 @@ export class UserDataManagerService extends BaseService implements IUserDataMana
    * Check if a UUID is invalid (contains commas, URLs, or other invalid characters)
    */
   private isInvalidUUID(uuid: string): boolean {
+    console.log('isInvalidUUID(): Checking UUID:', uuid);
+    
     // Check if it's a string
     if (typeof uuid !== 'string') {
+      console.log('isInvalidUUID(): Failed - not a string');
       return true;
     }
     
     // Check for common invalid patterns
-    if (uuid.includes(',') ||
-        uuid.includes(' ') ||
-        uuid.includes('://') ||
-        uuid.includes('ws://') ||
-        uuid.includes('wss://') ||
-        uuid.length > 100) { // UUIDs should be relatively short
+    if (uuid.includes(',')) {
+      console.log('isInvalidUUID(): Failed - contains comma');
+      return true;
+    }
+    if (uuid.includes(' ')) {
+      console.log('isInvalidUUID(): Failed - contains space');
+      return true;
+    }
+    if (uuid.includes('://')) {
+      console.log('isInvalidUUID(): Failed - contains ://');
+      return true;
+    }
+    if (uuid.includes('ws://')) {
+      console.log('isInvalidUUID(): Failed - contains ws://');
+      return true;
+    }
+    if (uuid.includes('wss://')) {
+      console.log('isInvalidUUID(): Failed - contains wss://');
+      return true;
+    }
+    if (uuid.length > 100) { // UUIDs should be relatively short
+      console.log('isInvalidUUID(): Failed - length > 100:', uuid.length);
       return true;
     }
     
@@ -346,9 +404,11 @@ export class UserDataManagerService extends BaseService implements IUserDataMana
     if (!uuidRegex.test(uuid)) {
       // Not a standard UUID format, but might still be valid
       // We'll be lenient and only reject obviously wrong ones
+      console.log('isInvalidUUID(): Not standard UUID format, but accepting as valid');
       return false;
     }
     
+    console.log('isInvalidUUID(): UUID is valid');
     return false;
   }
 
