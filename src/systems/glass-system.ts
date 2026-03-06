@@ -189,6 +189,37 @@ class Glass {
       } else if (mimetype === 'image/svg+xml') {
           return new SVGProcessor(this);
       } else {
+          // Check if this is actually HTML content based on file extension or content
+          try {
+              const uploads = JSON.parse(messageData.uploads || '[]');
+              const upload = uploads[0];
+              
+              if (upload) {
+                  // Check file extension
+                  const path = upload.path || '';
+                  
+                  if (path.toLowerCase().endsWith('.html') || path.toLowerCase().endsWith('.htm')) {
+                      return new HTMLProcessor(this);
+                  }
+                  
+                  // Check mimetype for HTML content
+                  if (mimetype === 'text/html' || mimetype.includes('html')) {
+                      return new HTMLProcessor(this);
+                  }
+                  
+                  // Also check upload mimetype
+                  const uploadMimetype = upload.mimetype || '';
+                  if (uploadMimetype === 'text/html' || uploadMimetype.includes('html')) {
+                      return new HTMLProcessor(this);
+                  }
+              } else {
+                  console.log('No upload found in uploads array');
+              }
+          } catch (error) {
+              console.error('Error parsing uploads in _getContentProcessor:', error);
+              console.error('uploads string:', messageData.uploads);
+          }
+          
           return new ImageProcessor(this);
       }
   }

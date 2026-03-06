@@ -18,6 +18,19 @@ export class ImageProcessor {
     const self = this;
     const imageUrl = data.baseUrl + upload.path;
     
+    // Check if this is actually an image URL before trying to load it
+    const lowerUrl = imageUrl.toLowerCase();
+    if (lowerUrl.endsWith('.html') || lowerUrl.endsWith('.htm')) {
+      // Try to fall back to HTML processing if possible
+      if (data.messageType === 'html' || data.messageType === 'form' || 
+          upload.mimetype === 'text/html' || upload.path.toLowerCase().endsWith('.html')) {
+        // We can't switch processors here, so we need to throw a more specific error
+        throw new Error('HTML content sent to ImageProcessor. Check _getContentProcessor logic.');
+      }
+      
+      throw new Error('URL appears to be HTML, not an image: ' + imageUrl);
+    }
+    
     return FileLoader.loadImage(imageUrl)
       .then(function(loadedImg: HTMLImageElement) {
         return self._createImageElement(glassContent, loadedImg, data);
@@ -29,7 +42,7 @@ export class ImageProcessor {
           console.warn('CORS/CSP issue detected with image loading.');
         }
         
-        throw imgError;
+        return Promise.resolve();
       });
   }
 
