@@ -66,6 +66,14 @@ export class FileLoader {
    */
   static loadImage(url: string): Promise<HTMLImageElement> {
     return new Promise(function(resolve, reject) {
+      // Primero verificar si la URL parece ser una imagen
+      // Si la URL termina con extensiones de archivo HTML, es probable que no sea una imagen
+      const lowerUrl = url.toLowerCase();
+      if (lowerUrl.endsWith('.html') || lowerUrl.endsWith('.htm')) {
+        reject(new Error('URL appears to be HTML, not an image: ' + url));
+        return;
+      }
+      
       const img = new Image()
       img.onload = function() { 
         resolve(img) 

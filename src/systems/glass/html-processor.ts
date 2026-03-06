@@ -27,49 +27,246 @@ export class HTMLProcessor {
     }
   }
 
-  async process(glassContent: HTMLElement, data: any, upload: any): Promise<void> {
-    const self = this;
+  private _createYoutubeElement(glassContent: HTMLElement, youtubeData: any): void {
+
+    if (!youtubeData || !youtubeData.url) {
+      console.error('Invalid YouTube data:', youtubeData);
+      return;
+    }
+
     try {
-      const htmlContentPromise = this._extractHtmlFromParameters(data);
+      const container = document.createElement('div');
+      container.className = 'container-default';
+      container.style.width = '450px';
+      container.style.height = '450px';
+      container.style.position = 'relative';
+      container.style.fontSize = '100px';
+
+      const youtubeDiv = document.createElement('div');
+      youtubeDiv.id = 'youtube001';
+      youtubeDiv.className = 'element-youtube001';
+      youtubeDiv.style.position = 'absolute';
+      youtubeDiv.style.left = '11.185%';
+      youtubeDiv.style.top = '5.538%';
+      youtubeDiv.style.fontSize = '0.16em';
+      youtubeDiv.style.width = '73.333%';
+      youtubeDiv.style.height = '53.556%';
+
+      const iframe = document.createElement('iframe');
       
-      if (htmlContentPromise instanceof Promise) {
-        const htmlContent = await htmlContentPromise;
-        const processedHtml = this._processVariables(htmlContent, data);
-        return this._createIframeElement(glassContent, processedHtml, data);
-      } else {
-        const processedHtml = this._processVariables(htmlContentPromise, data);
-        if (!processedHtml || processedHtml.trim() === '') {
+      // Asegurar que la URL tenga el formato correcto
+      let youtubeUrl = youtubeData.url;
+      
+      // DEBUG: Si el video tiene error 153, probar con un video conocido que funcione
+      console.log('Original YouTube URL:', youtubeUrl);
+      
+      // Si es un enlace de watch, convertirlo a embed
+      if (youtubeUrl.includes('youtube.com/watch?v=')) {
+        const videoId = youtubeUrl.split('v=')[1]?.split('&')[0];
+        if (videoId) {
+          youtubeUrl = `https://www.youtube.com/embed/${videoId}`;
+          console.log('Converted watch URL to embed URL:', youtubeUrl);
+        }
+      }
+      
+      // Agregar parámetros adicionales para mejor compatibilidad
+      try {
+        // Intentar crear URL y agregar parámetros
+        const urlObj = new URL(youtubeUrl);
+        urlObj.searchParams.set('rel', '0'); // No mostrar videos relacionados al final
+        urlObj.searchParams.set('modestbranding', '1'); // Menos branding de YouTube
+        urlObj.searchParams.set('playsinline', '1'); // Reproducir en línea en iOS
+        urlObj.searchParams.set('autoplay', '1'); // Auto-reproducir
+        urlObj.searchParams.set('mute', '0'); // No silenciado
+        urlObj.searchParams.set('controls', '1'); // Mostrar controles
+        urlObj.searchParams.set('enablejsapi', '1'); // Habilitar API JavaScript
+        
+        // Solo agregar origin si no es file:// (YouTube puede rechazar file://)
+        if (window.location.origin && !window.location.origin.startsWith('file://')) {
+          urlObj.searchParams.set('origin', window.location.origin);
+        }
+        
+        youtubeUrl = urlObj.toString();
+      } catch (error) {
+        console.warn('Could not parse YouTube URL for parameter enhancement:', error);
+        // Usar la URL original si no se puede parsear
+      }
+      
+      iframe.src = youtubeUrl;
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.style.borderRadius = '10px'; // Agregar bordes redondeados
+      
+      // Configuración de permisos más permisiva para YouTube
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
+      iframe.allowFullscreen = true;
+      iframe.referrerPolicy = 'no-referrer-when-downgrade';
+      iframe.title = 'YouTube video player';
+      iframe.frameBorder = '0';
+      
+      // Agregar sandbox con permisos específicos para YouTube
+      iframe.sandbox = 'allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-modals';
+      
+      // Agregar atributos adicionales para mejor compatibilidad
+      iframe.loading = 'eager'; // Cargar inmediatamente
+      iframe.setAttribute('allowtransparency', 'true');
+      iframe.setAttribute('scrolling', 'no');
+      
+      // Intentar forzar HTTPS si estamos en file://
+      if (window.location.origin.startsWith('file://')) {
+
+        // Agregar parámetro adicional para file://
+        try {
+          const urlObj = new URL(iframe.src);
+          urlObj.searchParams.set('fs', '1'); // Forzar pantalla completa
+          iframe.src = urlObj.toString();
+        } catch (error) {
+          console.warn('No se pudo actualizar URL para file://:', error);
+        }
+      }
+      
+      youtubeDiv.appendChild(iframe);
+      container.appendChild(youtubeDiv);
+
+      const style = document.createElement('style');
+      style.id = 'dynamic-styles';
+      style.textContent = `
+        .container-default { background: #7b76b9; border-radius: 5%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; font-family: Arial, sans-serif; }
+        .element-youtube001 { }
+        .element-youtube001:hover { }
+        .element-youtube001.active { }
+        .element-youtube001.active:hover { }
+      `;
+
+      glassContent.appendChild(container);
+      glassContent.appendChild(style);
+
+    } catch (error) {
+      console.error('Error creating YouTube element:', error);
+    }
+  }
+
+  private _containsYouTubeContent(htmlContent: string): boolean {
+
+    // Check if HTML contains YouTube iframe or YouTube URL
+    const lowerHtml = htmlContent.toLowerCase();
+
+    const hasEmbed = lowerHtml.includes('youtube.com/embed');
+    const hasYoutuBe = lowerHtml.includes('youtu.be');
+    const hasWatch = lowerHtml.includes('youtube.com/watch');
+    const hasSrcYoutube = lowerHtml.includes('src="https://www.youtube.com');
+    
+    const result = hasEmbed || hasYoutuBe || hasWatch || hasSrcYoutube;
+    
+    return result;
+  }
+
+  private _processYouTubeFromHtml(glassContent: HTMLElement, htmlContent: string, data: any): Promise<void> {
+    try {
+      // Parse HTML to extract YouTube URL
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      
+      // Look for iframe with YouTube URL
+      const iframe = tempDiv.querySelector('iframe[src*="youtube.com"], iframe[src*="youtu.be"]');
+      if (iframe) {
+        const youtubeUrl = iframe.getAttribute('src');
+        if (youtubeUrl) {
+          // Create YouTube element with extracted URL
+          this._createYoutubeElement(glassContent, { url: youtubeUrl });
           return Promise.resolve();
         }
-        return this._createIframeElement(glassContent, processedHtml, data);
       }
+      
+      // If no iframe found, try to create one from the HTML structure
+      // Look for div with id containing "youtube" or class containing "youtube"
+      const youtubeDiv = tempDiv.querySelector('[id*="youtube"], [class*="youtube"]');
+      if (youtubeDiv) {
+        // Try to extract URL from data attributes or text content
+        const possibleUrl = youtubeDiv.getAttribute('data-url') || 
+                           youtubeDiv.getAttribute('data-src') ||
+                           youtubeDiv.textContent?.trim();
+        
+        if (possibleUrl && (possibleUrl.includes('youtube.com') || possibleUrl.includes('youtu.be'))) {
+          this._createYoutubeElement(glassContent, { url: possibleUrl });
+          return Promise.resolve();
+        }
+      }
+      
+      // If we can't extract YouTube URL, fall back to regular HTML processing
+      console.warn('Could not extract YouTube URL from HTML, falling back to regular HTML processing');
+      const processedHtml = this._processVariables(htmlContent, data);
+      return this._createIframeElement(glassContent, processedHtml, data);
+    } catch (error) {
+      console.error('Error processing YouTube from HTML:', error);
+      // Fall back to regular HTML processing
+      const processedHtml = this._processVariables(htmlContent, data);
+      return this._createIframeElement(glassContent, processedHtml, data);
+    }
+  }
+
+  async process(glassContent: HTMLElement, data: any, upload: any): Promise<void> {
+
+    try {
+      // Check for explicit YouTube data
+      if (data.youtube) {
+        this._createYoutubeElement(glassContent, data.youtube);
+        return;
+      }
+
+      const htmlContentPromise = this._extractHtmlFromParameters(data);
+      const htmlContent = htmlContentPromise instanceof Promise ? 
+        await htmlContentPromise : htmlContentPromise;
+      
+      if (!htmlContent || htmlContent.trim() === '') {
+        return Promise.resolve();
+      }
+
+      // Check if HTML contains YouTube iframe
+      const containsYouTube = this._containsYouTubeContent(htmlContent);
+      
+      if (containsYouTube) {
+        return this._processYouTubeFromHtml(glassContent, htmlContent, data);
+      }
+
+      const processedHtml = this._processVariables(htmlContent, data);
+      return this._createIframeElement(glassContent, processedHtml, data);
     } catch (htmlError) {
-      console.error('Error extracting HTML from parameters:', htmlError);
+      console.error('Error processing content:', htmlError);
       throw htmlError;
     }
   }
 
   private _extractHtmlFromParameters(data: any): string | Promise<string> {
+    
     try {
-      if (data.messageType === 'form') {
-        const uploads = JSON.parse(data.uploads);
+      // Primero, verificar si hay uploads con contenido HTML
+      if (data.uploads) {
+        const uploads = JSON.parse(data.uploads);        
         const htmlUpload = uploads.find((upload: any) => {
-          return upload.mimetype === 'text/html' || upload.path.endsWith('.html');
+          const isHtml = upload.mimetype === 'text/html' || 
+                         upload.path.endsWith('.html') || 
+                         upload.path.endsWith('.htm');
+          return isHtml;
         });
         
         if (htmlUpload) {
           return this._loadHtmlFromUpload(htmlUpload, data);
+        } 
+      } 
+      // Si no hay uploads HTML, buscar en parámetros
+      if (data.parameters) {
+        const parameters = JSON.parse(data.parameters);
+        
+        const htmlParam = parameters.find((param: any) => param.label === 'html');
+        
+        if (htmlParam && htmlParam.value) {
+          return htmlParam.value;
         }
       }
       
-      const parameters = JSON.parse(data.parameters);
-      const htmlParam = parameters.find((param: any) => param.label === 'html');
-      
-      if (!htmlParam || !htmlParam.value) {
-        return '';
-      }
-      
-      return htmlParam.value;
+      return '';
     } catch (error) {
       console.error('Error extracting HTML from parameters:', error);
       throw new Error('Invalid parameters format: ' + (error as Error).message);
