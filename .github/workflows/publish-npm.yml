@@ -1,0 +1,68 @@
+name: Publicar en npm
+
+# Este paquete es el BASELINE del renderer: lo que ve una instalacion nueva del cliente
+# antes de su primer update en caliente. Las actualizaciones en caliente NO pasan por
+# aca: siguen yendo por el zip de S3 a los datos de usuario, que gana por version en el
+# proximo load de la ventana. Publicar aca no es urgente nunca; publicar en S3, si.
+#
+# Regla que conviene respetar: al publicar una version aca, subir S3 a la misma o mayor.
+# Si el baseline queda por encima, gana el baseline y el canal en caliente queda mudo
+# hasta que S3 lo pase.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Solo construir y empaquetar, sin publicar'
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: PRODUCTION
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Dependencias
+        run: npm ci
+
+      - name: El tag coincide con la version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          EN_PKG="v$(node -p "require('./package.json').version")"
+          echo "package.json: $EN_PKG | tag: $GITHUB_REF_NAME"
+          [ "$EN_PKG" = "$GITHUB_REF_NAME" ] || { echo "::error::el tag $GITHUB_REF_NAME no coincide con $EN_PKG"; exit 1; }
+
+      # El build sale igual en las dos ramas: lo que cambia es si se sube o no. Asi el
+      # dry-run prueba exactamente lo que se publicaria.
+      - name: Construir y empaquetar (dry-run)
+        if: inputs.dry_run
+        run: |
+          npm run build
+          npm pack --dry-run
+
+      - name: Publicar
+        if: ${{ !inputs.dry_run }}
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Resumen
+        if: success()
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "### @glassnote/renderer@$V" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Baseline. Acordate de subir el zip a S3 con version >= $V o el canal en caliente queda mudo." >> $GITHUB_STEP_SUMMARY

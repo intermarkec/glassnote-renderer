@@ -1,0 +1,7 @@
+# Mismo motivo que el .npmignore de la raíz: el .gitignore de esta carpeta excluye
+# `dist/`, que es lo único de aquí que hay que publicar.
+node_modules
+src
+public
+*.ts
+*.tgz

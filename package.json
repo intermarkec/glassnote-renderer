@@ -1,17 +1,25 @@
 {
-  "name": "glassnote-renderer-module",
+  "name": "@glassnote/renderer",
   "version": "2.0.9",
+  "description": "Renderer de GlassNote. Es el baseline que viaja con el cliente; las actualizaciones en caliente siguen llegando por S3 a los datos de usuario.",
   "type": "module",
+  "license": "UNLICENSED",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "_notes": "Con scope, npm publica restricted por defecto: sin esto quedaria privado (plan pago).",
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build && node copy-package-json.js",
     "preview": "vite preview",
-    "build:watch": "vite build --watch"
-  },
-  "dependencies": {
-    "vue": "^3.3.4"
+    "build:watch": "vite build --watch",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "vue": "^3.3.4",
     "@vitejs/plugin-vue": "^4.2.3",
     "typescript": "^5.0.2",
     "vite": "^4.4.5"
