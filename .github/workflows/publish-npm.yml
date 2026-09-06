@@ -21,6 +21,11 @@ on:
 
 permissions:
   contents: read
+  # Trusted publishing: npm no recibe ningun token: pide a GitHub un id-token OIDC y npm
+  # comprueba contra el publisher configurado en el paquete (org, repo, workflow y
+  # environment) que quien publica es este workflow. Sin este permiso el token no se emite
+  # y el publish cae de nuevo en "need auth".
+  id-token: write
 
 jobs:
   publish:
@@ -34,6 +39,11 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing entro en npm 11.5.1 y node 20 trae npm 10: sin esta linea el
+      # publish ignora el OIDC y pide token.
+      - name: npm con soporte de OIDC
+        run: npm install -g npm@latest
 
       - name: Dependencias
         run: npm ci
@@ -56,8 +66,6 @@ jobs:
       - name: Publicar
         if: ${{ !inputs.dry_run }}
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Resumen
         if: success()
