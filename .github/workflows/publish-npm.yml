@@ -40,10 +40,11 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      # Trusted publishing entro en npm 11.5.1 y node 20 trae npm 10: sin esta linea el
-      # publish ignora el OIDC y pide token.
+      # Trusted publishing entro en npm 11.5.1 y node 20 trae npm 10. Se fija la linea
+      # 11.x a proposito: `npm@latest` ya es npm 12, que pide Node >=22 y aborta con
+      # EBADENGINE antes de instalar nada.
       - name: npm con soporte de OIDC
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Dependencias
         run: npm ci
