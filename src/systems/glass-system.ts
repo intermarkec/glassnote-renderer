@@ -28,7 +28,6 @@ class Glass {
   private message: any
   public element: HTMLElement | null = null
   private durationTimeout: NodeJS.Timeout | null = null
-  private confirmationButtonTimeout: NodeJS.Timeout | null = null
   private positionKey: string | null = null
   private positionManager: PositionManager;
   public formResponse?: any;
@@ -131,16 +130,8 @@ class Glass {
     const position = JSON.parse(data.position || '{"h":1,"v":1}');
     const askConfirmation = data.askConfirmation === true;
     const isForm = this._isFormContent(glassContent);
-    const maxDurationWithoutConfirmation = 10; // segundos
-    
-    if (!askConfirmation) {
-      // Si no tiene botón de confirmación, mostrar uno obligatorio después de 10 segundos
-      this.confirmationButtonTimeout = setTimeout(() => {
-        if (!this.confirmButton && !this.isFinishing) {
-          this.confirmButton = new ConfirmationButton(this, position);
-        }
-      }, maxDurationWithoutConfirmation * 1000);
 
+    if (!askConfirmation) {
       // Configurar timeout de duración solo si no es formulario
       if (!isForm && data.duration) {
         this.durationTimeout = setTimeout(() => {
@@ -256,12 +247,6 @@ class Glass {
       this.durationTimeout = null;
     }
 
-    // Cancelar timeout de botón de confirmación
-    if (this.confirmationButtonTimeout) {
-      clearTimeout(this.confirmationButtonTimeout);
-      this.confirmationButtonTimeout = null;
-    }
-
     // Manejar botón de confirmación
     this._handleConfirmationButtonCleanup();
 
@@ -350,12 +335,6 @@ class Glass {
     if (this.durationTimeout) {
       clearTimeout(this.durationTimeout)
       this.durationTimeout = null
-    }
-
-    // Cancel confirmation button timeout
-    if (this.confirmationButtonTimeout) {
-      clearTimeout(this.confirmationButtonTimeout)
-      this.confirmationButtonTimeout = null
     }
 
     // Clean up confirmation button
