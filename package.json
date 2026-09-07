@@ -1,6 +1,6 @@
 {
   "name": "@glassnote/renderer",
-  "version": "2.0.9",
+  "version": "2.0.10",
   "description": "Renderer de GlassNote. Es el baseline que viaja con el cliente; las actualizaciones en caliente siguen llegando por S3 a los datos de usuario.",
   "type": "module",
   "license": "UNLICENSED",
