@@ -2,6 +2,44 @@ import { ScaleCalculator } from './scale-calculator';
 import { FileLoader } from './file-loader';
 import { SvgTextEngine, SvgParam, NewsRequest } from './svg/index';
 
+// Cuanto vale en px una unidad absoluta de CSS. El SVG de Inkscape trae el tamano en
+// milimetros —`width="508mm"`— y un parseFloat pelado se queda con el 508 y tira la
+// unidad, asi que un arte pensado para 1920 px se dibujaba de 508 y ocupaba un cuarto de
+// la pantalla. 508 mm son exactamente 1920 px al 96 dpi que asume CSS.
+const PX_POR_UNIDAD: { [unidad: string]: number } = {
+  '': 1,
+  px: 1,
+  in: 96,
+  cm: 96 / 2.54,
+  mm: 96 / 25.4,
+  q: 96 / 101.6,
+  pt: 96 / 72,
+  pc: 16
+};
+
+/**
+ * El atributo width/height de un <svg> resuelto a px.
+ *
+ * Devuelve 0 —y quien llama se va al viewBox— cuando la medida no se puede resolver sola:
+ * un porcentaje o una unidad relativa (em, rem, vw) dependen del contenedor o de la
+ * tipografia, y aca todavia no hay ninguno de los dos. Antes esas tambien caian en el
+ * parseFloat, y un `width="100%"` terminaba siendo un arte de 100 px.
+ */
+function resolverLongitud(valor: string | null): number {
+  if (!valor) return 0;
+
+  const partes = valor.trim().match(/^([+-]?[0-9]*\.?[0-9]+(?:e[+-]?[0-9]+)?)\s*([a-z%]*)$/i);
+  if (!partes) return 0;
+
+  const numero = parseFloat(partes[1]);
+  if (!isFinite(numero) || numero <= 0) return 0;
+
+  const factor = PX_POR_UNIDAD[partes[2].toLowerCase()];
+  if (factor === undefined) return 0;
+
+  return numero * factor;
+}
+
 interface GlassInstance {
   finishGlass: () => void;
 }
@@ -178,10 +216,13 @@ export class SVGProcessor {
       const wAttr = svgElement.getAttribute('width');
       const hAttr = svgElement.getAttribute('height');
 
-      if (wAttr && hAttr) {
-        svgWidth = parseFloat(wAttr);
-        svgHeight = parseFloat(hAttr);
+      svgWidth = resolverLongitud(wAttr);
+      svgHeight = resolverLongitud(hAttr);
+
+      if (svgWidth > 0 && svgHeight > 0) {
         if (!svgElement.getAttribute('viewBox')) {
+          // Sin viewBox una unidad de usuario es un px, asi que el lienzo en unidades
+          // de usuario mide lo mismo que el tamano que se acaba de resolver.
           svgElement.setAttribute(
             'viewBox',
             '0 0 ' + svgWidth + ' ' + svgHeight
