@@ -4,6 +4,11 @@
   "description": "Renderer de GlassNote. Es el baseline que viaja con el cliente; las actualizaciones en caliente siguen llegando por S3 a los datos de usuario.",
   "type": "module",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "_notes": "npm valida la procedencia (provenance) contra esta URL: si no es la del repo en github.com, el publish del workflow muere con 422 aunque el paquete este bien.",
+    "url": "git+https://github.com/intermarkec/glassnote-renderer.git"
+  },
   "files": [
     "dist"
   ],
