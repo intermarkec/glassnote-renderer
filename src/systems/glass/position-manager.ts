@@ -202,6 +202,18 @@ export class PositionManager {
       }
     }
 
+    // El arte apaisado ahora llena el ancho y se sale por arriba y por abajo, asi que
+    // glassRect.top puede ser negativo y glassRect.bottom mayor que la ventana. Cualquiera
+    // sea la rama que eligio la posicion, el boton tiene que quedar dentro de la ventana:
+    // si no, sale cortado por el borde y no se lo puede tocar.
+    if (buttonStyles.top && buttonStyles.top !== 'auto') {
+      const propuesto = parseFloat(buttonStyles.top);
+      if (isFinite(propuesto)) {
+        const minimo = scaledMargin;
+        const maximo = Math.max(minimo, windowHeight - buttonSize - scaledMargin);
+        buttonStyles.top = Math.min(Math.max(propuesto, minimo), maximo) + 'px';
+      }
+    }
     return buttonStyles;
   }
 
