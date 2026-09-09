@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- El mismo texto en las cuatro alineaciones, mas un marco al que el texto no entra
+     para ver la reduccion automatica. -->
+<svg width="900" height="440" viewBox="0 0 900 440" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <rect x="20"  y="40"  width="410" height="150" id="m1" />
+    <rect x="470" y="40"  width="410" height="150" id="m2" />
+    <rect x="20"  y="250" width="410" height="150" id="m3" />
+    <rect x="470" y="250" width="410" height="62" id="m4" />
+  </defs>
+  <g font-family="sans-serif" font-size="13" fill="#64748b">
+    <text x="20"  y="30">izquierda</text>
+    <text x="470" y="30">centro</text>
+    <text x="20"  y="240">derecha</text>
+    <text x="470" y="240">justificado, y no entra: se reduce</text>
+  </g>
+  <g fill="none" stroke="#cbd5e1">
+    <rect x="20"  y="40"  width="410" height="150" />
+    <rect x="470" y="40"  width="410" height="150" />
+    <rect x="20"  y="250" width="410" height="150" />
+    <rect x="470" y="250" width="410" height="62" />
+  </g>
+  <text xml:space="preserve" id="c1" style="font-size:17px;line-height:1.35;font-family:sans-serif;white-space:pre;shape-inside:url(#m1);shape-padding:10;text-align:start;fill:#0f172a">%TEXTO%</text>
+  <text xml:space="preserve" id="c2" style="font-size:17px;line-height:1.35;font-family:sans-serif;white-space:pre;shape-inside:url(#m2);shape-padding:10;text-align:center;fill:#0f172a">%TEXTO%</text>
+  <text xml:space="preserve" id="c3" style="font-size:17px;line-height:1.35;font-family:sans-serif;white-space:pre;shape-inside:url(#m3);shape-padding:10;text-align:end;fill:#0f172a">%TEXTO%</text>
+  <text xml:space="preserve" id="c4" style="font-size:17px;line-height:1.35;font-family:sans-serif;white-space:pre;shape-inside:url(#m4);shape-padding:10;text-align:justify;fill:#0f172a">%TEXTO% %TEXTO%</text>
+</svg>

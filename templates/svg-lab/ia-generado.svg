@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Estilo tipico de un SVG escrito por una IA: <style> embebido, clases, tspan con x/y
+     por linea, y un & sin escapar que hace que no sea XML valido. -->
+<svg width="480" height="220" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .titulo { font: 700 26px "Helvetica Neue", Arial, sans-serif; fill: #0f172a; }
+    .cuerpo { font: 400 15px Arial, sans-serif; fill: #334155; }
+  </style>
+  <rect width="480" height="220" fill="#e2e8f0"/>
+  <text class="titulo" x="24" y="52">Reporte & resumen</text>
+  <text class="cuerpo" x="24" y="92">
+    <tspan x="24" y="92">Responsable: %NOMBRE%</tspan>
+    <tspan x="24" y="116">Detalle: %ASUNTO%</tspan>
+  </text>
+  <text class="cuerpo" x="24" y="160" style="inline-size:432">Observaciones: %ASUNTO%. Este parrafo tiene ancho fijo y debe partirse solo en varias lineas.</text>
+</svg>

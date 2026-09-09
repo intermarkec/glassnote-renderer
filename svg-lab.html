@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Banco de pruebas del parser de SVG</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 24px; background: #fff; color: #0f172a; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.lead { margin: 0 0 20px; color: #475569; }
+  fieldset { border: 1px solid #cbd5e1; border-radius: 6px; margin: 0 0 20px; padding: 12px 16px; }
+  legend { font-weight: 600; padding: 0 6px; }
+  label { display: inline-block; margin-right: 16px; }
+  input { font: inherit; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; }
+  .caso { border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 20px; overflow: hidden; }
+  .caso > h2 { font-size: 14px; margin: 0; padding: 8px 12px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
+  .par { display: grid; grid-template-columns: 1fr 1fr; }
+  .lado { padding: 12px; min-width: 0; overflow-x: auto; }
+  .lado + .lado { border-left: 1px solid #e2e8f0; }
+  .lado h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #64748b; margin: 0 0 8px; }
+  .lado svg { max-width: 100%; height: auto; }
+  .informe { font: 12px ui-monospace, monospace; color: #475569; padding: 6px 12px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+</style>
+</head>
+<body>
+  <h1>Banco de pruebas del parser de SVG</h1>
+  <p class="lead">Izquierda: el SVG tal como lo dibuja el navegador hoy. Derecha: despues de pasar por el motor.</p>
+  <fieldset>
+    <legend>Parametros</legend>
+    <label>%NOMBRE% <input id="p-nombre" size="24" /></label>
+    <label>%ASUNTO% <input id="p-asunto" size="46" /></label>
+    <label>%TEXTO% <input id="p-texto" size="60" /></label>
+  </fieldset>
+  <div id="casos"></div>
+  <script type="module" src="/src/dev/svg-lab.ts"></script>
+</body>
+</html>

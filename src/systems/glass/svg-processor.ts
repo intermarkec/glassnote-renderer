@@ -1,5 +1,6 @@
 import { ScaleCalculator } from './scale-calculator';
 import { FileLoader } from './file-loader';
+import { SvgTextEngine, SvgParam } from './svg/index';
 
 interface GlassInstance {
   finishGlass: () => void;
@@ -15,59 +16,130 @@ export class SVGProcessor {
   }
 
   async process(glassContent: HTMLElement, data: any, upload: any): Promise<void> {
-    const self = this;
     const svgUrl = data.baseUrl + upload.path;
-    
-    return this._loadAndProcessSvg(svgUrl, data)
-      .then(function(processedSvgContent: string) {
-        return self._createSvgElement(glassContent, processedSvgContent, data);
-      })
-      .catch(function(svgError: Error) {
-        console.error('Error processing SVG:', svgError);
-        
-        if (self._isCorsOrCspError(svgError)) {
-          console.warn('CORS/CSP issue detected with SVG loading.');
-        }
-        
-        throw svgError;
-      });
+
+    try {
+      const svgContent = await FileLoader.loadText(svgUrl);
+      await this._createSvgElement(glassContent, svgContent, data);
+    } catch (svgError) {
+      console.error('Error processing SVG:', svgError);
+
+      if (this._isCorsOrCspError(svgError as Error)) {
+        console.warn('CORS/CSP issue detected with SVG loading.');
+      }
+
+      throw svgError;
+    }
   }
 
-  private _loadAndProcessSvg(svgUrl: string, data: any): Promise<string> {
-    const self = this;
-    
-    return FileLoader.loadText(svgUrl)
-      .then(function(svgContent: string) {
-        return self._processVariables(svgContent);
-      });
-  }
-
-  private _processVariables(svgContent: string): string {
-    const appVersion = window.appVersion || '';
-    const rendererVersion = window.rendererVersion || 'TEMPORAL';
-    return svgContent.replace(
-      /%VERSION%/g,
-      appVersion + ',' + rendererVersion
-    );
-  }
-
-  private _createSvgElement(glassContent: HTMLElement, processedSvgContent: string, data: any): Promise<void> {
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = processedSvgContent;
-    glassContent.appendChild(wrapper);
-
-    const svgElement = glassContent.querySelector('svg');
+  private async _createSvgElement(glassContent: HTMLElement, svgContent: string, data: any): Promise<void> {
+    const svgElement = this._parseSvg(svgContent);
     if (!svgElement) {
       throw new Error('No SVG element found in content');
     }
 
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(svgElement);
+    glassContent.appendChild(wrapper);
+
     svgElement.style.display = 'block';
     svgElement.style.transform = 'translateZ(0)';
 
+    // Va con el SVG ya insertado: la composicion resuelve estilos con getComputedStyle
+    // y mide con las fuentes reales, y ninguna de las dos cosas funciona fuera del DOM.
+    await this._processText(svgElement, data);
+
     this._configureSvgDimensions(svgElement, wrapper);
     this._processNewsElements(svgElement, data);
-    
-    return Promise.resolve();
+  }
+
+  /**
+   * Parsea el SVG. Primero como XML, porque es lo unico que conserva los nombres de
+   * etiqueta de Inkscape: el parser de HTML baja <flowRoot> a <flowroot> y <flowPara>
+   * a <flowpara>. Si el archivo no es XML bien formado, cosa frecuente en los SVG que
+   * escribe una IA, se cae al parser de HTML, que es tolerante y arregla el markup.
+   */
+  private _parseSvg(svgContent: string): SVGSVGElement | null {
+    try {
+      const doc = new DOMParser().parseFromString(svgContent, 'image/svg+xml');
+      const failed = doc.getElementsByTagName('parsererror').length > 0;
+      const root = doc.documentElement;
+
+      if (!failed && root && root.nodeName.toLowerCase() === 'svg') {
+        return document.importNode(root, true) as unknown as SVGSVGElement;
+      }
+
+      console.warn('[svg] el archivo no es XML valido, se reintenta con el parser de HTML');
+    } catch (parseError) {
+      console.warn('[svg] DOMParser fallo, se reintenta con el parser de HTML:', parseError);
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = svgContent;
+    return wrapper.querySelector('svg');
+  }
+
+  private async _processText(svgElement: SVGSVGElement, data: any): Promise<void> {
+    try {
+      const report = await SvgTextEngine.process(svgElement, this._collectParams(data), {
+        // %NEWS% lo consume la marquesina de mas abajo, que necesita ver el marcador.
+        skipLabels: ['%NEWS%']
+      });
+
+      if (report.composed > 0 || report.substitutions > 0) {
+        console.log(
+          '[svg] variables: ' + report.substitutions +
+          ' | areas de texto: ' + report.areas +
+          ' | compuestas: ' + report.composed +
+          ' | reducidas para que entren: ' + report.shrunk
+        );
+      }
+    } catch (textError) {
+      console.error('[svg] fallo la composicion de texto, se dibuja el SVG tal cual:', textError);
+    }
+  }
+
+  /**
+   * Los parametros del mensaje, mas %VERSION%.
+   * Hasta ahora en SVG solo se sustituian %VERSION% y %NEWS%, y cualquier otra variable
+   * del arte se quedaba a la vista con el marcador crudo.
+   */
+  private _collectParams(data: any): SvgParam[] {
+    const appVersion = window.appVersion || '';
+    const rendererVersion = window.rendererVersion || 'TEMPORAL';
+    const params: SvgParam[] = [
+      { label: '%VERSION%', value: appVersion + ',' + rendererVersion }
+    ];
+
+    if (!data || !data.parameters) return params;
+
+    try {
+      const parsed = typeof data.parameters === 'string'
+        ? JSON.parse(data.parameters)
+        : data.parameters;
+
+      if (Array.isArray(parsed)) {
+        for (let i = 0; i < parsed.length; i++) {
+          const param = parsed[i];
+          if (param && param.label) {
+            params.push({ label: param.label, value: param.value });
+          }
+        }
+      } else if (parsed && typeof parsed === 'object') {
+        // La API manda un arreglo, pero el editor los maneja indexados por etiqueta.
+        const keys = Object.keys(parsed);
+        for (let i = 0; i < keys.length; i++) {
+          const param = parsed[keys[i]];
+          const label = param && param.label ? param.label : keys[i];
+          const value = param && param.value !== undefined ? param.value : param;
+          params.push({ label: label, value: value });
+        }
+      }
+    } catch (error) {
+      console.error('[svg] no se pudieron leer los parametros del mensaje:', error);
+    }
+
+    return params;
   }
 
   private _configureSvgDimensions(svgElement: SVGElement, wrapper: HTMLDivElement): void {

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- El caso que rompia el parser viejo: Inkscape partio %NOMBRE% en dos tspan porque
+     se edito a mitad de palabra. Un replace sobre la cadena del archivo no lo ve. -->
+<svg width="480" height="140" viewBox="0 0 480 140" version="1.1"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg">
+  <text xml:space="preserve" x="24" y="50" id="t1"
+     style="font-size:22px;font-family:sans-serif;fill:#1a1a1a">Hola <tspan id="a" style="font-weight:bold">%NOM</tspan><tspan id="b" style="font-weight:bold">BRE%</tspan>, bienvenido.</text>
+  <text xml:space="preserve" x="24" y="96" id="t2"
+     style="font-size:18px;font-family:sans-serif;fill:#555">Asunto: <tspan id="c">%ASU</tspan><tspan id="d">NTO%</tspan></text>
+</svg>
