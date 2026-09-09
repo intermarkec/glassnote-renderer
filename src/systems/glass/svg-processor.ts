@@ -45,11 +45,39 @@ export class SVGProcessor {
     svgElement.style.display = 'block';
     svgElement.style.transform = 'translateZ(0)';
 
-    // Va con el SVG ya insertado: la composicion resuelve estilos con getComputedStyle
-    // y mide con las fuentes reales, y ninguna de las dos cosas funciona fuera del DOM.
-    await this._processText(svgElement, data);
+    // El contenido del glass todavia no esta en el documento en este punto: el sistema
+    // lo inserta recien cuando este metodo resuelve. Y getComputedStyle sobre un
+    // elemento suelto devuelve vacio, asi que el texto se mediria con la fuente por
+    // defecto del navegador en vez de la del arte, y saldrian mal tanto los cortes de
+    // linea como la duracion de la marquesina. Se ancla a un host invisible mientras
+    // dura la composicion y se devuelve a su sitio al terminar.
+    const host = glassContent.isConnected ? null : this._attachOffscreen(glassContent);
+    try {
+      await this._processText(svgElement, data);
+    } finally {
+      if (host) this._detachOffscreen(host, glassContent);
+    }
 
     this._configureSvgDimensions(svgElement, wrapper);
+  }
+
+  /** Ancla el contenido fuera de la vista para poder resolver estilos y medir. */
+  private _attachOffscreen(glassContent: HTMLElement): HTMLElement {
+    const host = document.createElement('div');
+    host.setAttribute('data-glass-medicion', 'true');
+    host.style.cssText =
+      'position:fixed;left:-99999px;top:0;width:100vw;height:100vh;' +
+      'overflow:hidden;pointer-events:none;opacity:0';
+
+    document.body.appendChild(host);
+    host.appendChild(glassContent);
+    return host;
+  }
+
+  /** Devuelve el contenido a su estado suelto, que es como lo espera el sistema. */
+  private _detachOffscreen(host: HTMLElement, glassContent: HTMLElement): void {
+    if (glassContent.parentNode === host) host.removeChild(glassContent);
+    if (host.parentNode) host.parentNode.removeChild(host);
   }
 
   /**
@@ -162,10 +190,18 @@ export class SVGProcessor {
       } else {
         const vb = svgElement.getAttribute('viewBox');
         if (vb) {
-          const parts = vb.split(/\s+/).map(Number);
+          const parts = vb.split(/[\s,]+/).map(Number);
           if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
             svgWidth = parts[2];
             svgHeight = parts[3];
+
+            // Sin width ni height el <svg> no tiene tamano propio, y dentro de un
+            // contenedor que se ajusta al contenido eso se resuelve en cero. El
+            // dimensionado de mas abajo espera a que el elemento mida algo antes de
+            // asignarle su tamano, asi que sin esto nunca arranca y el glass no se ve.
+            // Los export de Illustrator son siempre asi: solo viewBox.
+            svgElement.setAttribute('width', String(svgWidth));
+            svgElement.setAttribute('height', String(svgHeight));
           }
         }
       }

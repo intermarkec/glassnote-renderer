@@ -53,6 +53,9 @@ const GAP_EM = 4
 /** Velocidad de reserva si el parametro viene vacio o en cero. */
 const DEFAULT_SPEED = 50
 
+/** Tope de copias, por si una plantilla pide un texto minusculo en una ventana enorme. */
+const MAX_COPIES = 64
+
 export class NewsTicker {
   private _layout: TextLayout
   private _sequence = 0
@@ -75,7 +78,12 @@ export class NewsTicker {
     const composed = this._layout.composeSingleLine(area, '   ')
     if (!composed || composed.width <= 0) return vacio
 
-    const frame = this._window(root, area, composed.baseline, composed.lineHeight, composed.ascent)
+    // Con marco del disenador se recorta a ese marco. Sin marco no hace falta recortar
+    // nada: el propio <svg> ya recorta a su viewport, que es justo lo que se quiere.
+    const framed = area.kind !== 'plain' && area.width > 0
+    const frame = framed
+      ? { x: area.left, y: area.top, width: area.width, height: area.height !== null && area.height > 0 ? area.height : composed.lineHeight * 1.6 }
+      : this._canvasInLocalSpace(root, area.element)
     if (frame.width <= 0) return vacio
 
     this._sequence++
@@ -107,36 +115,55 @@ export class NewsTicker {
     if (originalId) outer.setAttribute('id', originalId)
 
     const clipped = document.createElementNS(SVG_NS, 'g')
-    clipped.setAttribute('clip-path', 'url(#' + clipId + ')')
+    if (framed) clipped.setAttribute('clip-path', 'url(#' + clipId + ')')
 
     const track = document.createElementNS(SVG_NS, 'g')
     track.setAttribute('id', trackId)
 
     let copies: number
+    let first = 0
+    let last = 0
     let from: number
     let to: number
     let duration: number
 
     if (request.loop) {
-      // Bucle continuo: se repite el texto hasta cubrir la ventana mas un paso, y se
-      // desplaza exactamente un paso. Al terminar, la copia siguiente esta donde estaba
-      // la anterior, asi que el empalme no se ve.
-      copies = Math.ceil((frame.width + step) / step) + 1
+      // Bucle continuo: se desplaza exactamente un paso, asi que al terminar la copia
+      // siguiente queda donde estaba la anterior y el empalme no se ve.
+      //
+      // Las copias tienen que cubrir la ventana durante TODA la vuelta, y eso incluye
+      // copias a la izquierda del punto de partida. En las plantillas reales el texto
+      // arranca cerca del borde derecho (428 de 508, 1618 de 1920): sin copias previas,
+      // al completar la vuelta aparece de golpe texto a la izquierda que en el
+      // fotograma inicial no estaba, y el salto se ve en cada vuelta.
+      first = Math.floor((frame.x - area.left - composed.width) / step) - 1
+      last = Math.ceil((frame.x + frame.width - area.left) / step) + 1
+      copies = last - first + 1
       from = 0
       to = -step
       duration = step / speed
     } else {
       // Una sola pasada: entra por la derecha de la ventana y sale por la izquierda.
       copies = 1
+      first = 0
+      last = 0
       from = frame.width - (area.left - frame.x)
       to = -(composed.width + (area.left - frame.x))
       duration = (from - to) / speed
     }
 
-    for (let i = 0; i < copies; i++) {
+    // Un texto muy corto en una ventana muy ancha pide muchas copias. Se acota para que
+    // una plantilla rara no llene el arbol de nodos.
+    if (copies > MAX_COPIES) {
+      last = first + MAX_COPIES - 1
+      copies = MAX_COPIES
+      console.warn('[svg-text] marquesina acotada a ' + MAX_COPIES + ' copias')
+    }
+
+    for (let k = first; k <= last; k++) {
       const copy = composed.text.cloneNode(true) as SVGTextElement
-      if (i > 0) copy.setAttribute('transform', 'translate(' + this._round(i * step) + ',0)')
-      copy.setAttribute('aria-hidden', i > 0 ? 'true' : 'false')
+      if (k !== 0) copy.setAttribute('transform', 'translate(' + this._round(k * step) + ',0)')
+      copy.setAttribute('aria-hidden', k === 0 ? 'false' : 'true')
       track.appendChild(copy)
     }
 
@@ -144,7 +171,7 @@ export class NewsTicker {
     outer.appendChild(clipped)
     parent.replaceChild(outer, area.element)
 
-    this._addClip(root, clipId, frame)
+    if (framed) this._addClip(root, clipId, frame)
     this._addAnimation(root, animName, trackId, from, to, duration, request.loop)
 
     if (!request.loop && request.onFinish) {
@@ -155,34 +182,59 @@ export class NewsTicker {
   }
 
   /**
-   * La ventana por la que se ve pasar el texto. Si el area tiene marco, ese es. Si el
-   * texto es suelto, se toma el ancho del lienzo y una franja de alto generoso alrededor
-   * de la linea base, para no cortar acentos ni colas.
+   * El lienzo visible, expresado en el sistema de coordenadas propio del texto.
+   *
+   * Hace falta esa conversion porque el texto puede venir colocado con un transform en
+   * vez de con x e y. Los export de Illustrator lo hacen siempre: escriben
+   * <text transform="matrix(1 0 0 1 1618 916)"> sin x ni y. Si se tomara el viewBox tal
+   * cual, se estaria midiendo el lienzo desde un origen corrido 1618 unidades.
+   *
+   * Solo se usa para saber cuantas copias hacen falta: cuando no hay marco del
+   * disenador no se recorta nada, porque el propio <svg> ya recorta a su viewport.
    */
-  private _window(
+  private _canvasInLocalSpace(
     root: SVGSVGElement,
-    area: TextArea,
-    baseline: number,
-    lineHeight: number,
-    ascent: number
+    element: Element
   ): { x: number; y: number; width: number; height: number } {
-    if (area.kind !== 'plain' && area.width > 0) {
-      return {
-        x: area.left,
-        y: area.top,
-        width: area.width,
-        height: area.height !== null && area.height > 0 ? area.height : lineHeight * 1.6
-      }
-    }
-
     const box = this._viewBox(root)
-    const alto = Math.max(lineHeight, ascent * 1.35) * 1.4
-    return {
-      x: box.x,
-      y: baseline - ascent - (alto - lineHeight) / 2,
-      width: box.width,
-      height: alto
+
+    try {
+      const rootCTM = root.getScreenCTM()
+      const localCTM = (element as SVGGraphicsElement).getScreenCTM()
+      if (!rootCTM || !localCTM) return box
+
+      // De coordenadas locales del texto a coordenadas del lienzo, y su inversa.
+      const toLocal = localCTM.inverse().multiply(rootCTM)
+      const corners = [
+        this._map(toLocal, box.x, box.y),
+        this._map(toLocal, box.x + box.width, box.y),
+        this._map(toLocal, box.x, box.y + box.height),
+        this._map(toLocal, box.x + box.width, box.y + box.height)
+      ]
+
+      let minX = corners[0].x
+      let maxX = corners[0].x
+      let minY = corners[0].y
+      let maxY = corners[0].y
+      for (let i = 1; i < corners.length; i++) {
+        if (corners[i].x < minX) minX = corners[i].x
+        if (corners[i].x > maxX) maxX = corners[i].x
+        if (corners[i].y < minY) minY = corners[i].y
+        if (corners[i].y > maxY) maxY = corners[i].y
+      }
+
+      if (!isFinite(minX) || maxX - minX <= 0) return box
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+    } catch (error) {
+      // getScreenCTM falla si el SVG todavia no tiene geometria. El viewBox crudo es una
+      // aproximacion suficiente para contar copias.
+      console.warn('[svg-text] no se pudo mapear el lienzo al espacio del texto:', error)
+      return box
     }
+  }
+
+  private _map(m: DOMMatrix, x: number, y: number): { x: number; y: number } {
+    return { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f }
   }
 
   private _viewBox(root: SVGSVGElement): { x: number; y: number; width: number; height: number } {
