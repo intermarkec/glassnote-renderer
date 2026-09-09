@@ -86,10 +86,14 @@ Lo que importa desde este lado: **la ventana casi nunca es 16:9**. Cualquier pan
 16:9 con una barra de tareas ya queda mas ancha que 16:9. El desborde vertical en apaisado
 es la situacion habitual, no la excepcion.
 
-## Limite conocido
+## Un arte vertical en una pantalla apaisada se corta, y esta bien
 
-Un arte **vertical** en una pantalla **apaisada** se desborda. Como en apaisado solo se
-corrige el ancho, un 1080x1920 en una ventana de 1920x1055 sale de 1080x1920 y se ve una
-franja: desborda 865px de alto. Con la regla anterior entraba entero, de 593x1055. Es lo
-que dicen las reglas, pero conviene saberlo porque hay plantillas verticales en
-produccion.
+No hay excepcion: se aplica la misma regla de siempre, se ajusta al ancho y se recorta
+segun la posicion. Un arte de 1080x1920 en una ventana de 1920x1055 queda en 1080x1920 y
+se ven 1055 de esos 1920.
+
+Es a proposito. Un arte vertical enviado a un equipo horizontal es un error de diseno o de
+asignacion, no un caso que el renderer tenga que salvar. La regla de apaisado esta pensada
+para el arte que se hace a 1920x1080 con la intencion de llenar el ancho; que un arte que
+no sigue esa intencion se vea mal es la senal de que hay que corregir el arte o a quien se
+le asigno.
