@@ -9,6 +9,7 @@ import { SvgTextEngine, SvgParam } from '../systems/glass/svg/index'
 interface Caso {
   archivo: string
   titulo: string
+  noticia?: boolean
 }
 
 const CASOS: Caso[] = [
@@ -17,13 +18,17 @@ const CASOS: Caso[] = [
   { archivo: 'inkscape-inline-size.svg', titulo: 'Inkscape 1.x, inline-size, centrado' },
   { archivo: 'alineaciones.svg', titulo: 'Las cuatro alineaciones y la reduccion' },
   { archivo: 'variable-partida.svg', titulo: 'Variable partida entre dos tspan' },
-  { archivo: 'ia-generado.svg', titulo: 'SVG de IA: <style>, clases y XML mal formado' }
+  { archivo: 'ia-generado.svg', titulo: 'SVG de IA: <style>, clases y XML mal formado' },
+  { archivo: 'noticias.svg', titulo: 'Marquesina: texto suelto y texto con marco', noticia: true },
+  { archivo: 'inkscape-complejo.svg', titulo: 'Fidelidad: grupos, recortes, mascara, filtro y degradados' },
+  { archivo: 'illustrator.svg', titulo: 'Fidelidad: export de Illustrator con <style> y clases' }
 ]
 
 const PREDETERMINADOS: Record<string, string> = {
   '%NOMBRE%': 'Maria Fernanda Villavicencio',
   '%ASUNTO%': 'su solicitud fue aprobada el dia de hoy',
-  '%TEXTO%': 'El texto se reparte en lineas dentro del marco y respeta la alineacion.'
+  '%TEXTO%': 'El texto se reparte en lineas dentro del marco y respeta la alineacion.',
+  '%DETALLE%': 'Linea de detalle'
 }
 
 const campos: Record<string, HTMLInputElement> = {}
@@ -111,7 +116,15 @@ async function pintar(): Promise<void> {
 
       const inicio = performance.now()
       const reporte = await SvgTextEngine.process(procesado, parametros(), {
-        skipLabels: ['%NEWS%']
+        news: caso.noticia
+          ? {
+              label: '%NEWS%',
+              text: '- ' + (campos['%TEXTO%'] ? campos['%TEXTO%'].value : PREDETERMINADOS['%TEXTO%']),
+              speed: 60,
+              loop: true,
+              glassId: 'lab' + i
+            }
+          : undefined
       })
       const ms = Math.round((performance.now() - inicio) * 10) / 10
 
@@ -120,6 +133,7 @@ async function pintar(): Promise<void> {
         '   areas: ' + reporte.areas +
         '   compuestas: ' + reporte.composed +
         '   reducidas: ' + reporte.shrunk +
+        '   marquesinas: ' + reporte.tickers +
         '   tiempo: ' + ms + ' ms'
     } catch (error) {
       informe.textContent = 'error: ' + (error as Error).message
@@ -131,7 +145,8 @@ function arrancar(): void {
   const mapa: Record<string, string> = {
     '%NOMBRE%': 'p-nombre',
     '%ASUNTO%': 'p-asunto',
-    '%TEXTO%': 'p-texto'
+    '%TEXTO%': 'p-texto',
+    '%DETALLE%': 'p-detalle'
   }
 
   const etiquetas = Object.keys(mapa)

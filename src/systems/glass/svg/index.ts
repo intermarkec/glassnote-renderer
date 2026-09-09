@@ -5,19 +5,25 @@
 //      linea equivocados, y la sustitucion no se puede deshacer despues.
 //   2. Sustituir los %VAR%. Antes del wrap, porque el ancho a repartir es el del valor
 //      final y no el del marcador.
-//   3. Detectar las areas de texto y componerlas.
+//   3. Localizar el texto de noticias mientras el marcador todavia esta puesto, y recien
+//      entonces sustituirlo.
+//   4. Detectar las areas de texto: las de noticias van a la marquesina y el resto al
+//      motor de composicion.
 
 import { SvgVariables, SvgParam } from './svg-variables'
 import { TextAreaFinder, TextArea } from './text-areas'
 import { TextMeasurer } from './text-measurer'
 import { TextLayout } from './text-layout'
+import { NewsTicker, NewsRequest } from './news-ticker'
 
 export { SvgVariables } from './svg-variables'
 export { TextAreaFinder } from './text-areas'
 export { TextMeasurer } from './text-measurer'
 export { TextLayout } from './text-layout'
+export { NewsTicker } from './news-ticker'
 export type { SvgParam } from './svg-variables'
 export type { TextArea, TextAlign } from './text-areas'
+export type { NewsRequest, NewsResult } from './news-ticker'
 
 export interface SvgTextReport {
   /** Variables sustituidas, contando texto y atributos. */
@@ -28,15 +34,19 @@ export interface SvgTextReport {
   composed: number
   /** Areas que hubo que achicar para que entraran. */
   shrunk: number
+  /** Marquesinas de noticias montadas. */
+  tickers: number
 }
 
 export interface SvgTextOptions {
-  /** Etiquetas que gestiona otro proceso y no hay que tocar, como %NEWS%. */
+  /** Etiquetas que gestiona otro proceso y no hay que tocar. */
   skipLabels?: string[]
   /** Escala minima del cuerpo al reducir para que entre. */
   minFontScale?: number
   /** Milisegundos maximos de espera por las fuentes. */
   fontTimeout?: number
+  /** Marquesina de noticias. La etiqueta se sustituye aparte, despues de localizarla. */
+  news?: NewsRequest & { label: string }
 }
 
 export class SvgTextEngine {
@@ -50,14 +60,39 @@ export class SvgTextEngine {
     options?: SvgTextOptions
   ): Promise<SvgTextReport> {
     const settings = options || {}
-    const report: SvgTextReport = { substitutions: 0, areas: 0, composed: 0, shrunk: 0 }
+    const news = settings.news
+    const report: SvgTextReport = {
+      substitutions: 0,
+      areas: 0,
+      composed: 0,
+      shrunk: 0,
+      tickers: 0
+    }
 
     await this._fontsReady(settings.fontTimeout === undefined ? 3000 : settings.fontTimeout)
 
+    // La etiqueta de noticias se salta en la pasada general: primero hay que ver que
+    // elementos la llevan, porque despues de sustituirla ya no se los reconoce.
+    const skip = (settings.skipLabels || []).slice()
+    if (news && skip.indexOf(news.label) === -1) skip.push(news.label)
+
     try {
-      report.substitutions = SvgVariables.substitute(root, params, settings.skipLabels)
+      report.substitutions = SvgVariables.substitute(root, params, skip)
     } catch (error) {
       console.error('[svg-text] fallo la sustitucion de variables:', error)
+    }
+
+    let newsElements: Element[] = []
+    if (news) {
+      try {
+        newsElements = SvgVariables.elementsWithLabel(root, news.label)
+        report.substitutions += SvgVariables.substitute(
+          root,
+          [{ label: news.label, value: news.text }]
+        )
+      } catch (error) {
+        console.error('[svg-text] fallo la sustitucion de la noticia:', error)
+      }
     }
 
     let areas: TextArea[] = []
@@ -73,13 +108,21 @@ export class SvgTextEngine {
 
     const measurer = new TextMeasurer(root)
     const layout = new TextLayout(measurer, settings.minFontScale)
+    const ticker = new NewsTicker(layout)
 
     try {
       for (let i = 0; i < areas.length; i++) {
         const area = areas[i]
-        if (area.kind === 'plain' && !this._needsPlainRebuild(area)) continue
+        const esNoticia = news !== undefined && newsElements.indexOf(area.element) !== -1
 
         try {
+          if (esNoticia && news) {
+            if (ticker.apply(root, area, news).applied) report.tickers++
+            continue
+          }
+
+          if (area.kind === 'plain' && !this._needsPlainRebuild(area)) continue
+
           const result = layout.apply(area)
           if (result.applied) {
             report.composed++

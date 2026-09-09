@@ -45,6 +45,62 @@ las variables: con un `%NOMBRE%` largo el texto se sale del marco.
   un salto de linea: en ese caso se reparte en varias lineas y las que venian despues se
   empujan hacia abajo, conservando su interlineado original.
 
+## Fidelidad con el arte original
+
+Lo que no es texto no se toca: el motor solo reemplaza los elementos de texto, y lo hace
+con `replaceChild`, asi que el nodo nuevo queda en la misma posicion entre sus hermanos,
+dentro del mismo grupo, y conserva `id`, `transform`, `clip-path`, `mask`, `filter`,
+`opacity`, `class` y cualquier atributo propio. Un `<use>` que apuntaba al texto por su
+`id` sigue resolviendo.
+
+Comparado contra el render del propio Inkscape sobre un arte con grupos anidados,
+rotaciones, `clipPath`, mascara de luminancia, filtro de desenfoque, degradados lineal y
+radial con `gradientTransform`, y un patron de fondo: **todo lo que no es texto sale
+identico**. La unica diferencia esta en los glifos, y es el rasterizador: Inkscape dibuja
+con Cairo y el navegador con Skia. Medida sobre ese arte, el 97.5% de los pixeles no
+llega a diferenciarse en 8 niveles sobre 255, y el bloque de texto no tiene desplazamiento
+sistematico: la mejor alineacion entre ambos renders es exactamente cero.
+
+Los export de Illustrator tambien salen identicos. Illustrator posiciona el texto con
+`transform="matrix(...)"` en vez de `x`/`y`, y eso funciona igual. Ojo con una cosa: al
+exportar, Illustrator **pierde el marco** del texto de area y lo escribe como lineas ya
+partidas. Un texto de Illustrator no se puede volver a partir porque no queda en el
+archivo la caja que lo contenia; si hace falta wrap, el arte tiene que venir de Inkscape.
+
+El SVG se parsea como XML y se cae al parser de HTML solo si el archivo no es XML bien
+formado. Para SVG estandar ambos caminos dan un render byte a byte identico; el parseo
+XML solo hace falta por el `<flowRoot>` de Inkscape, que el parser de HTML convierte a
+`<flowroot>` por no conocerlo.
+
+## Marquesina de noticias
+
+Un texto marcado con `%NEWS%` no se compone: se convierte en marquesina. Se puede hacer
+con SVG puro y no hace falta pasar por HTML.
+
+    <g [transform del texto original]>      <- ocupa el lugar exacto del <text>
+      <g clip-path="url(#...)">             <- la ventana por la que se asoma
+        <g id="gn-news-track-...">          <- lo unico que se anima
+          <text/> <text/> <text/>           <- copias encadenadas
+
+- **La ventana** es el marco si el disenador dibujo uno; si el texto es suelto, el ancho
+  del lienzo. Antes no habia recorte y el texto pasaba por encima del resto del arte.
+- **El ancho** lo da el medidor, con las fuentes ya cargadas. Antes se pedia con
+  `getBBox()` tras un `setTimeout` de 50 ms, y si las fuentes llegaban tarde el ancho
+  salia mal, o se usaba un 200 fijo. De ese ancho depende la duracion del recorrido.
+- **El bucle empalma**: se emiten copias suficientes para cubrir la ventana y se desplaza
+  exactamente un paso, asi que la copia siguiente queda donde estaba la anterior.
+  Verificado comparando el fotograma en t=0 con el de una vuelta completa: identicos,
+  diferencia maxima 0. Antes el texto desaparecia y reaparecia desde el principio.
+- **Los estilos sobreviven**: si en el arte la noticia esta en negrita o en otro color,
+  se conserva. Antes se hacia `textContent = ...`, que aplana todos los `<tspan>` y se
+  lleva por delante cualquier estilo por tramo.
+- **La animacion es CSS**, no SMIL. Con `%LOOP%` en false se hace una sola pasada, entra
+  por la derecha y sale por la izquierda, y al terminar avisa por `animationend`.
+
+Cambio de aspecto respecto de lo anterior: ya no hay el fundido de entrada y salida que
+hacia el `<animate>` de opacidad en cada vuelta. Con el bucle continuo no hace falta, y
+con la pasada unica el texto entra y sale deslizandose.
+
 ## Limites conocidos
 
 - **Fuentes genericas.** El navegador y Inkscape resuelven `sans-serif` a fuentes
@@ -56,6 +112,8 @@ las variables: con un `%NOMBRE%` largo el texto se sale del marco.
   linea base cae en el mismo sitio; donde difieren, como DejaVu Sans, queda 0.04 em mas
   abajo: medio pixel a cuerpo 16.
 - No hay soporte de texto de derecha a izquierda ni de escritura vertical.
+- Un texto de area exportado desde Illustrator no se puede volver a partir: el export no
+  conserva el marco.
 - `shape-inside` sobre una forma que no sea un rectangulo se aproxima por su caja
   envolvente: no se contornea la forma real.
 

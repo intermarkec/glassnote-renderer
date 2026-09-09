@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Dos marquesinas: la de arriba es un texto suelto (la ventana es el lienzo) y la de
+     abajo tiene marco de Inkscape, asi que la ventana es ese marco. -->
+<svg width="600" height="220" viewBox="0 0 600 220" version="1.1"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <rect x="120" y="140" width="360" height="40" id="marcoNoticia" />
+  </defs>
+  <rect width="600" height="220" fill="#0f172a"/>
+  <rect x="0" y="30" width="600" height="46" fill="#1e293b"/>
+  <text xml:space="preserve" x="20" y="62" id="tickerSuelto"
+     style="font-size:22px;font-family:DejaVu Sans;fill:#f8fafc">EN VIVO: <tspan style="font-weight:bold;fill:#fbbf24">%NEWS%</tspan></text>
+
+  <rect x="120" y="140" width="360" height="40" fill="#1e293b" stroke="#334155"/>
+  <text xml:space="preserve" id="tickerMarco"
+     style="font-size:18px;line-height:1.2;font-family:DejaVu Sans;white-space:pre;shape-inside:url(#marcoNoticia);shape-padding:6;fill:#a5f3fc">%NEWS%</text>
+</svg>

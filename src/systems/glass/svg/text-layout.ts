@@ -53,6 +53,14 @@ interface Line {
   lastOfParagraph: boolean
 }
 
+export interface SingleLine {
+  text: SVGTextElement
+  width: number
+  baseline: number
+  lineHeight: number
+  ascent: number
+}
+
 export interface LayoutResult {
   applied: boolean
   scale: number
@@ -90,6 +98,68 @@ export class TextLayout {
     parent.replaceChild(replacement, area.element)
 
     return { applied: true, scale: scale, lines: lines.length }
+  }
+
+  /**
+   * Compone el area en una sola linea y devuelve el <text> sin insertarlo, junto con su
+   * ancho medido. Lo usa la marquesina de noticias: necesita el texto con los estilos de
+   * cada tramo intactos y, sobre todo, el ancho exacto, que es lo que fija la duracion
+   * del recorrido. Medido asi no hace falta getBBox ni esperar a un setTimeout.
+   */
+  composeSingleLine(area: TextArea, separator: string): SingleLine | null {
+    const styles = this._resolveRunStyles(area)
+    if (styles.length === 0) return null
+
+    // Los tramos vienen numerados por parrafo. Al juntar todo en una linea hay que
+    // aplanar los estilos y correr el indice de cada token, o el tramo del segundo
+    // parrafo terminaria pintado con el estilo del primero.
+    const flatStyles: RunStyle[] = []
+    const tokens: Token[] = []
+
+    for (let p = 0; p < area.paragraphs.length; p++) {
+      const base = flatStyles.length
+      for (let r = 0; r < styles[p].length; r++) flatStyles.push(styles[p][r])
+
+      if (p > 0 && separator && flatStyles.length > 0) {
+        tokens.push({ text: separator, isSpace: false, run: base })
+      }
+
+      const propios = this._tokenize(area.paragraphs[p], true)
+      for (let i = 0; i < propios.length; i++) {
+        tokens.push({ text: propios[i].text, isSpace: propios[i].isSpace, run: base + propios[i].run })
+      }
+    }
+
+    if (flatStyles.length === 0) return null
+
+    const trimmed = this._trimSpaces(tokens)
+    let width = 0
+    for (let i = 0; i < trimmed.length; i++) {
+      const style = flatStyles[trimmed[i].run] || flatStyles[0]
+      width += this._measurer.measure(trimmed[i].text, style.font)
+    }
+
+    const style = flatStyles[0]
+    const lineHeight = style.lineHeight
+    const ascent = style.font.fontSize * this._measurer.ascentFraction(style.font)
+    const baseline = area.firstBaseline !== null
+      ? area.firstBaseline
+      : area.top + ascent + (lineHeight - style.font.fontSize) / 2
+
+    const line: Line = { tokens: trimmed, width: width, height: lineHeight, lastOfParagraph: true }
+    const text = document.createElementNS(SVG_NS, 'text') as SVGTextElement
+    this._copyAttributes(area.element, text)
+    text.setAttributeNS(XML_NS, 'xml:space', 'preserve')
+    text.setAttribute('style', this._rootStyle(area, styles, 1, false))
+    text.appendChild(this._renderLine(line, flatStyles, area, area.left, baseline, 1, false))
+
+    return {
+      text: text,
+      width: width,
+      baseline: baseline,
+      lineHeight: lineHeight,
+      ascent: ascent
+    }
   }
 
   // ------------------------------------------------------------------ estilos

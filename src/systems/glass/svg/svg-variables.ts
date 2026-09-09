@@ -78,6 +78,24 @@ export class SvgVariables {
     return Object.keys(found)
   }
 
+  /**
+   * Elementos de texto cuyo contenido incluye una etiqueta. Sirve para localizar el
+   * texto de noticias antes de sustituirlo, que es cuando todavia se lo puede reconocer.
+   * Mira sobre el contenido concatenado, asi que encuentra la etiqueta aunque Inkscape
+   * la haya partido entre varios tspan.
+   */
+  static elementsWithLabel(root: Element, label: string): Element[] {
+    const encontrados: Element[] = []
+    const containers = this._textContainers(root)
+
+    for (let i = 0; i < containers.length; i++) {
+      const texto = this._collectTextNodes(containers[i]).map(node => node.data).join('')
+      if (texto.indexOf(label) !== -1) encontrados.push(containers[i])
+    }
+
+    return encontrados
+  }
+
   private static _buildLookup(
     params: SvgParam[],
     skipLabels?: string[]
