@@ -34,6 +34,18 @@ su tamano real, lo que pase primero. Medido en 1080x1920:
     arte 1080x1920  ->  1080x1920   escala 1.000   exacto
     arte 1920x1080  ->  1080x608    escala 0.563
 
+## Vale para los tres tipos de glass
+
+`ScaleCalculator` lo comparten el SVG, la imagen y el HTML, y es a proposito: los tres se
+disenan sobre el mismo lienzo. Un arte mas angosto que 1920 ocupa la fraccion del ancho
+que le corresponde, no se estira. Medido en una ventana de 1920x1055:
+
+    imagen  natural 1270x564    ->  1270x564   escala 1.000   (66% del ancho)
+    html    declarado 1200x400  ->  1200x400   escala 1.000   (62.5% del ancho)
+
+Con la regla anterior daban 0.977 de escala, porque el `min` contra el alto los achicaba
+aunque no hiciera falta.
+
 ## Posicion
 
 `position` es `{h, v}` con indices 0/1/2: izquierda/centro/derecha y arriba/centro/abajo.
