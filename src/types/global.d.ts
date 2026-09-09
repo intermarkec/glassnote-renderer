@@ -57,6 +57,7 @@ declare global {
     // Properties used in dom-events.ts and other files
     handleScreenEvent?: (event: string) => void
     removeFromUnifiedQueue?: (messageId: string) => void
+    retirarMensaje?: (messageId: string) => void
     rendererVersion?: string
     showSplash?: () => void
     _configMenuInstance?: any

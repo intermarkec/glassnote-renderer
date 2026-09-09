@@ -194,8 +194,30 @@ function processUnifiedQueue(): void {
   }
 }
 
+/**
+ * Baja un mensaje que dejo de estar activo: el servidor avisa y hay que sacarlo de la
+ * pantalla, este puesto o esperando turno en la cola.
+ *
+ * No se avisa nada de vuelta: la transaccion ya la cerro el servidor al desactivar el
+ * mensaje. Y se sale por `retirar()` y no por `finishGlass()` justo por eso: un final
+ * normal avisaria SUCCESS, y esto no es haberlo visto.
+ */
+function retirarMensaje(messageId: string): void {
+  if (!messageId) return
+
+  removeFromUnifiedQueue(messageId)
+
+  if (!window.activeGlasses) return
+  for (const [, activo] of window.activeGlasses) {
+    if (activo && activo.messageId === messageId && activo.glass) {
+      activo.glass.retirar()
+    }
+  }
+}
+
 // Make removeFromUnifiedQueue globally available
 window.removeFromUnifiedQueue = removeFromUnifiedQueue
+window.retirarMensaje = retirarMensaje
 
 // Modify Glass constructor to use unified queue for new glasses only
 const originalGlassConstructor = window.Glass

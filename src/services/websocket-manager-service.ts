@@ -486,6 +486,14 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     } else if (message.event === 'message' &&
               ['image', 'news', 'form', 'html'].indexOf(message.data.messageType) !== -1) {
       this.handleDisplayMessage(url, message);
+
+    } else if (message.event === 'remove_message') {
+      // El mensaje se desactivo en el servidor: si esta puesto se baja, y si esta
+      // esperando turno se saca de la cola.
+      const retirar = (window as any).retirarMensaje;
+      if (typeof retirar === 'function') {
+        retirar(String(message.data?.messageId ?? ''));
+      }
     }
   }
 

@@ -37,6 +37,9 @@ class Glass {
   public img: HTMLElement;
   public activeConnections: Map<string, WebSocket>;
   public wasConfirmed: boolean = false;
+  // Lo bajaron desde el servidor (el mensaje se desactivo). No es un final normal: no
+  // se avisa SUCCESS, porque no se llego a ver lo que el mensaje pedia.
+  public retirado: boolean = false;
 
   constructor(url: string | null, message: any) {
     this.url = url || ''
@@ -65,9 +68,22 @@ class Glass {
     if (window.activeGlasses && this.positionKey) {
       window.activeGlasses.set(this.positionKey, {
         id: this.message.data.id,
+        // El messageId y la instancia son lo que permite bajar un glass puesto cuando el
+        // servidor avisa que el mensaje se desactivo: por posicion no se lo encuentra.
+        messageId: this.message.data.messageId,
+        glass: this,
         timestamp: Date.now(),
       })
     }
+  }
+
+  /**
+   * Lo baja de la pantalla porque el mensaje dejo de estar activo, no porque haya
+   * cumplido: sale igual que siempre —con su fundido— pero sin avisar SUCCESS.
+   */
+  public retirar(): void {
+    this.retirado = true
+    this.finishGlass()
   }
 
   private displayGlass(): void {
@@ -318,7 +334,10 @@ class Glass {
     }
     
     // Send success notification before cleanup
-    this._sendNotification('success', responseData)
+    // Salvo que lo hayan bajado desde el servidor: eso no es haberlo cumplido.
+    if (!this.retirado) {
+      this._sendNotification('success', responseData)
+    }
     
     // Remove from unified queue when glass finishes displaying
     if (window.removeFromUnifiedQueue && this.message && this.message.data) {
@@ -359,6 +378,7 @@ class Glass {
     this.isFinishing = false;
     this.confirmationCounted = false;
     this.wasConfirmed = false;
+    this.retirado = false;
 
     // Check window visibility
     console.log('Glass cleanup: Calling checkWindowVisibility()');
