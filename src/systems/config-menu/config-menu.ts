@@ -48,6 +48,12 @@ export class ConfigMenu {
   // Review system properties
   private pendingRequestsMap: Map<string, {serverUrl: string, timestamp: number, requestId: string}> = new Map();
   private accumulatedTransactions: Map<string, ReviewTransaction[]> = new Map();
+  // La lista se pide de a tandas y cada servidor lleva la suya: con varios conectados no
+  // hay un "siguiente" global que valga, porque la lista que se ve es la mezcla ordenada
+  // por fecha de todos ellos.
+  private offsetPorServidor: Map<string, number> = new Map();
+  private hayMasPorServidor: Map<string, boolean> = new Map();
+  private readonly GLASSES_POR_TANDA = 10;
   private currentRequestId: string | null = null;
 
   constructor() {
@@ -201,6 +207,9 @@ export class ConfigMenu {
       this.reviewView = new ReviewView(viewContent);
       this.reviewView.setTransactions(this.transactions);
       this.reviewView.setPendingRequests(this.pendingRequests);
+      this.reviewView.setOnLoadMore(() => {
+        this.requestTransactions(true);
+      });
       this.reviewView.setOnPlayTransaction((transaction) => {
         this.handlePlayTransaction(transaction);
       });
@@ -379,48 +388,68 @@ export class ConfigMenu {
     return this.isVisible;
   }
   
-    private async requestTransactions(): Promise<void> {
+    /**
+     * Pide una tanda de glasses. Con `siguienteTanda` en false empieza de cero —es abrir
+     * la lista—; en true trae los que siguen, que es lo que pasa al llegar al final del
+     * scroll, y solo a los servidores a los que todavia les queda algo.
+     */
+    private async requestTransactions(siguienteTanda: boolean = false): Promise<void> {
       try {
         this.currentRequestId = 'review_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
         this.pendingRequestsMap.clear();
-        this.accumulatedTransactions.clear();
+        if (!siguienteTanda) {
+          this.accumulatedTransactions.clear();
+          this.offsetPorServidor.clear();
+          this.hayMasPorServidor.clear();
+        }
         
-        const message = {
-          event: 'review',
-          data: {
-            limit: 10,
-            requestId: this.currentRequestId
-          }
-        };
-        
-        console.log('ConfigMenu: Requesting transactions from all servers, requestId:', this.currentRequestId);
+        console.log('ConfigMenu: Requesting transactions from all servers, requestId:', this.currentRequestId, 'siguienteTanda:', siguienteTanda);
         
         // Use window.activeConnections which should be maintained by the WebSocket manager
         if (window.activeConnections && window.activeConnections.size > 0) {
           let requestsSent = 0;
           window.activeConnections.forEach((ws, url) => {
-            if (ws.readyState === WebSocket.OPEN) {
-              console.log('ConfigMenu: Sending review request to:', url);
-              ws.send(JSON.stringify(message));
-              this.pendingRequestsMap.set(url, {
-                serverUrl: url,
-                timestamp: Date.now(),
-                requestId: this.currentRequestId!
-              });
-              requestsSent++;
-            } else {
+            if (ws.readyState !== WebSocket.OPEN) {
               console.log('ConfigMenu: Skipping server', url, '- WebSocket state:', ws.readyState);
+              return;
             }
+            // Al que ya dijo que no le queda nada no se le vuelve a preguntar.
+            if (siguienteTanda && this.hayMasPorServidor.get(url) !== true) {
+              return;
+            }
+            const offset = siguienteTanda ? (this.offsetPorServidor.get(url) || 0) : 0;
+            console.log('ConfigMenu: Sending review request to:', url, 'offset:', offset);
+            ws.send(JSON.stringify({
+              event: 'review',
+              data: {
+                limit: this.GLASSES_POR_TANDA,
+                offset: offset,
+                requestId: this.currentRequestId
+              }
+            }));
+            this.pendingRequestsMap.set(url, {
+              serverUrl: url,
+              timestamp: Date.now(),
+              requestId: this.currentRequestId!
+            });
+            requestsSent++;
           });
           
           console.log('ConfigMenu: Total requests sent:', requestsSent);
           
           if (requestsSent === 0) {
-            console.log('ConfigMenu: No open connections available');
-            this.reviewView.showNoConnections();
+            if (siguienteTanda) {
+              // No quedaba nada que pedir: la lista deja de ofrecer mas.
+              this.reviewView.setHayMas(false);
+            } else {
+              console.log('ConfigMenu: No open connections available');
+              this.reviewView.showNoConnections();
+            }
           } else {
-            this.reviewView.showLoadingWithServers(requestsSent);
+            if (!siguienteTanda) {
+              this.reviewView.showLoadingWithServers(requestsSent);
+            }
             
             // Set up a listener for review responses
             this.setupReviewResponseListener();
@@ -469,7 +498,13 @@ export class ConfigMenu {
               description: transaction.messageDescription || this.extractDescriptionFromUploads(transaction.uploads)
             }));
             
-            this.accumulateTransactions(url, transactionsWithServer);
+            // Lo que dice el servidor sobre la paginacion. Un servidor viejo no manda
+            // nada de esto: `hayMas` queda en false y la lista se comporta como antes.
+            const offsetRespondido = Number(message.offset) || 0;
+            this.offsetPorServidor.set(url, offsetRespondido + message.data.length);
+            this.hayMasPorServidor.set(url, message.hayMas === true);
+
+            this.accumulateTransactions(url, transactionsWithServer, offsetRespondido > 0);
             this.pendingRequestsMap.delete(url);
             
             console.log('ConfigMenu: Remaining pending requests:', this.pendingRequestsMap.size);
@@ -506,8 +541,17 @@ export class ConfigMenu {
       }
     }
   
-    private accumulateTransactions(serverUrl: string, transactions: ReviewTransaction[]): void {
-      this.accumulatedTransactions.set(serverUrl, transactions);
+    private accumulateTransactions(serverUrl: string, transactions: ReviewTransaction[], agregar: boolean = false): void {
+      if (!agregar) {
+        this.accumulatedTransactions.set(serverUrl, transactions);
+        return;
+      }
+      // Una tanda siguiente se suma a lo que ya habia. Se filtra por id porque si entre
+      // dos tandas llego un glass nuevo, el corte se corre y alguno vendria repetido.
+      const previas = this.accumulatedTransactions.get(serverUrl) || [];
+      const conocidas = new Set(previas.map((t) => String(t.id)));
+      const nuevas = transactions.filter((t) => !conocidas.has(String(t.id)));
+      this.accumulatedTransactions.set(serverUrl, previas.concat(nuevas));
     }
   
     private displayAccumulatedTransactions(): void {
@@ -524,6 +568,10 @@ export class ConfigMenu {
   
       this.transactions = allTransactions;
       this.reviewView.setTransactions(allTransactions);
+      // Con varios servidores alcanza con que a UNO le quede algo para seguir ofreciendo.
+      let quedaAlguno = false;
+      this.hayMasPorServidor.forEach((hayMas) => { if (hayMas) quedaAlguno = true; });
+      this.reviewView.setHayMas(quedaAlguno);
     }
   
     private handleRequestTimeout(): void {

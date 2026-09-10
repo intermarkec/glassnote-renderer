@@ -5,6 +5,12 @@ export class ReviewView {
   private transactions: Transaction[] = [];
   private pendingRequests: PendingRequest[] = [];
   private onPlayTransaction?: (transaction: ReviewTransaction) => void;
+  private onLoadMore?: () => void;
+  private hayMas: boolean = false;
+  private cargandoMas: boolean = false;
+  // Donde estaba el scroll antes de volver a dibujar. Sin esto, cada tanda nueva te
+  // devuelve al principio de la lista, que es justo de donde venias bajando.
+  private scrollGuardado: number = 0;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -13,6 +19,20 @@ export class ReviewView {
   setTransactions(transactions: Transaction[]): void {
     this.transactions = transactions;
     this.render();
+  }
+
+  /**
+   * Si quedan mas glasses para traer. Lo dice el servidor; mientras sea true la lista
+   * sigue pidiendo al llegar al final del scroll.
+   */
+  setHayMas(hayMas: boolean): void {
+    this.hayMas = hayMas;
+    this.cargandoMas = false;
+    this.render();
+  }
+
+  setOnLoadMore(callback: () => void): void {
+    this.onLoadMore = callback;
   }
 
   setPendingRequests(pendingRequests: PendingRequest[]): void {
@@ -25,8 +45,12 @@ export class ReviewView {
   }
 
   render(): void {
+    const lista = this.container.querySelector('.transactions-scroll');
+    if (lista) this.scrollGuardado = lista.scrollTop;
     this.container.innerHTML = this.generateHTML();
     this.attachEventListeners();
+    const nueva = this.container.querySelector('.transactions-scroll') as HTMLElement | null;
+    if (nueva && this.scrollGuardado) nueva.scrollTop = this.scrollGuardado;
   }
 
   private generateHTML(): string {
@@ -71,20 +95,33 @@ export class ReviewView {
     }).join('');
 
     return `
-      <table class="transactions-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Name</th>
-            <th>Description</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
+      <div class="transactions-scroll">
+        <table class="transactions-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+        ${this.generatePieDeLista()}
+      </div>
     `;
+  }
+
+  private generatePieDeLista(): string {
+    if (this.cargandoMas) {
+      return '<div class="lista-pie">Cargando mas...</div>';
+    }
+    if (this.hayMas) {
+      return '<div class="lista-pie">Segui bajando para ver mas</div>';
+    }
+    return '<div class="lista-pie lista-pie-final">No hay mas glasses</div>';
   }
 
   private generatePendingRequestsHTML(): string {
@@ -112,6 +149,24 @@ export class ReviewView {
   }
 
   private attachEventListeners(): void {
+    // Carga al llegar al final: se pide la tanda siguiente un poco ANTES del borde, para
+    // que la lista no se corte mientras baja.
+    const lista = this.container.querySelector('.transactions-scroll') as HTMLElement | null;
+    if (lista) {
+      lista.addEventListener('scroll', () => {
+        // Al redibujar, el contenedor viejo se reemplaza pero su listener sigue vivo y
+        // puede recibir un scroll que quedo en camino. Ya fuera del documento mide todo
+        // 0, o sea "estoy al final", y pediria una tanda de mas por cada redibujado.
+        if (!lista.isConnected) return;
+        if (!this.hayMas || this.cargandoMas || !this.onLoadMore) return;
+        const faltaParaElFinal = lista.scrollHeight - lista.scrollTop - lista.clientHeight;
+        if (faltaParaElFinal > 60) return;
+        this.cargandoMas = true;
+        this.render();
+        this.onLoadMore();
+      });
+    }
+
     const playButtons = this.container.querySelectorAll('.play-button');
     playButtons.forEach(button => {
       button.addEventListener('click', (event) => {

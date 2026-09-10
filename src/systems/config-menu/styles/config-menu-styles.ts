@@ -401,6 +401,41 @@ export const configMenuStyles = `
   font-weight: 600;
 }
 
+/* La lista de glasses tiene su propio scroll: crece por tandas y sin esto empujaba el
+   menu entero hasta dejar los botones de arriba fuera de la pantalla. */
+.transactions-scroll {
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.transactions-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.transactions-scroll::-webkit-scrollbar-track {
+  background: #e0e5ec;
+  border-radius: 8px;
+  box-shadow: inset 1px 1px 3px #b8bec7, inset -1px -1px 3px #ffffff;
+}
+
+.transactions-scroll::-webkit-scrollbar-thumb {
+  background: #d1d9e6;
+  border-radius: 8px;
+  box-shadow: 1px 1px 2px #b8bec7, -1px -1px 2px #ffffff;
+}
+
+.lista-pie {
+  padding: 10px 0 4px;
+  text-align: center;
+  font-size: 12px;
+  color: #7a8ba6;
+}
+
+.lista-pie-final {
+  color: #a3aec0;
+}
+
 .transactions-table {
   width: 100%;
   border-collapse: separate;
