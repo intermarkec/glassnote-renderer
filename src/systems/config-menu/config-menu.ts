@@ -602,7 +602,11 @@ export class ConfigMenu {
           duration: transaction.duration || 10,
           transparency: transaction.transparency || '0.80',
           needPresent: transaction.needPresent || false,
-          askConfirmation: transaction.askConfirmation || false,
+          // Siempre con la X, aunque el mensaje original no la pidiera: esto es una
+          // repeticion a mano desde el menu y el que la pidio tiene que poder cerrarla
+          // cuando termine de mirarla. Sin la X el glass se va solo a los `duration`
+          // segundos, que en un mensaje corto es antes de que lo termines de leer.
+          askConfirmation: true,
           isAsyncronous: transaction.isAsyncronous || false,
           uploads: transaction.uploads || '[]',
           parameters: transaction.parameters || '[]',
