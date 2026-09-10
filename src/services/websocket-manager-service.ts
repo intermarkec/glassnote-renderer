@@ -1,6 +1,7 @@
 import { BaseService } from './base-service';
 import { IWebSocketManager, ConnectionStatus, WebSocketMessage } from './interfaces';
 import { serviceRegistry } from './registry';
+import { esPreview } from '../utils/preview';
 
 /**
  * WebSocket Manager Service
@@ -27,6 +28,9 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     window.addEventListener('network-restored', () => this.handleNetworkRestored());
     
     // Auto-connect to servers after a short delay
+    // En previsualizacion no: el renderer embebido en la web no es un equipo, no tiene
+    // que aparecer conectado ni recibir los mensajes de nadie.
+    if (esPreview()) return;
     setTimeout(() => this.autoConnectToServers(), 2000);
   }
 

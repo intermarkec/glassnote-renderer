@@ -1,6 +1,7 @@
 import { GlassData } from '../utils/global'
 import { serviceRegistry } from '../services/registry'
 import { IWindowVisibility } from '../services/interfaces'
+import { esPreview } from '../utils/preview'
 
 /**
  * Get the window visibility service
@@ -306,6 +307,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Global function to show splash
   window.showSplash = function(): void {
+    // En previsualizacion no hay saludo de arranque: la pagina embebe el renderer para
+    // ver un mensaje, no para verlo presentarse.
+    if (esPreview()) return
     console.log('showSplash function called')
     loadSplashTemplate().then((template) => {
       console.log('Splash template loaded successfully')
@@ -433,7 +437,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // In browser mode, Tab key should open the config menu when it's closed
   // Use centralized platform detection
   const isBrowserMode = window.isBrowserMode ? window.isBrowserMode() : (!window.electronAPI && !window.AndroidBridge);
-  if (isBrowserMode) {
+  // En previsualizacion el Tab es de la pagina que embebe, no del menu de config.
+  if (isBrowserMode && !esPreview()) {
     document.addEventListener('keydown', function(event) {
       // Check if Tab key is pressed (keyCode 9 or key 'Tab')
       if (event.key === 'Tab' || event.keyCode === 9) {

@@ -581,6 +581,21 @@ export class ConfigMenu {
       }
     }
   
+    /**
+     * Le avisa al servidor que este glass se volvio a mirar a mano desde el menu. Queda
+     * anotado aparte —cuantas veces y cuando— sin tocar el estado ni las fechas de la
+     * transaccion: lo que paso en su momento no cambia porque despues alguien lo repita.
+     */
+    private avisarReproduccionManual(transaction: ReviewTransaction): void {
+      if (!transaction.id || !transaction.serverUrl) return;
+      const ws = window.activeConnections?.get(transaction.serverUrl);
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({
+        event: 'notify',
+        data: { id: transaction.id, event: 'replayed' },
+      }));
+    }
+
     private handlePlayTransaction(transaction: ReviewTransaction): void {
       console.log('ConfigMenu: Play transaction clicked for:', transaction.name, 'from server:', transaction.serverUrl);
       console.log('ConfigMenu: Transaction data:', JSON.stringify(transaction, null, 2));
@@ -621,8 +636,14 @@ export class ConfigMenu {
       if (window.Glass && typeof window.Glass === 'function') {
         try {
           console.log('ConfigMenu: Glass class available, creating instance');
-          const glassInstance = new window.Glass(transaction.serverUrl || null, glassMessage);
+          // Sin servidor a proposito: esto es volver a mirar un glass que ya paso, no una
+          // entrega. Con la url puesta el glass encuentra el websocket y le avisa al
+          // servidor DISPLAYED y SUCCESS con el id de la transaccion original, que ya
+          // estaba cerrada: le corre las fechas y le cambia el estado —una expirada
+          // pasaria a cumplida— y ensucia los reportes. Sin url no hay a quien avisarle.
+          const glassInstance = new window.Glass(null, glassMessage);
           console.log('ConfigMenu: Glass instance created successfully:', glassInstance);
+          this.avisarReproduccionManual(transaction);
           console.log('ConfigMenu: Glass instance properties:', Object.keys(glassInstance));
         } catch (error) {
           console.error('Error creating Glass for transaction:', error);

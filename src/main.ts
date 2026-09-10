@@ -37,6 +37,9 @@ import { setupRegistrationSystem } from './systems/registration-system'
 // Import dom-events last to ensure all dependencies are loaded
 import './systems/dom-events'
 
+// Previsualizacion embebida (?preview=1). Va al final: necesita el sistema de glass ya cargado.
+import './systems/preview-mode'
+
 console.log('Glass system modules loaded and available globally')
 
 // Setup registration system
