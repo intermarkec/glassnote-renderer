@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Editor de efectos · Glassnote</title>
+<style>
+  /* Los mismos colores y formas que el panel web: tarjeta blanca con borde gris claro,
+     cabecera gris, violeta de marca en los botones. Es la misma herramienta para la misma
+     gente, asi que no tiene por que parecer otra cosa.
+
+     El violeta es el --color-nav del panel; los grises, la escala de Tailwind que usa
+     MessageConfigurationPanel (gray-50/200/300/500/700). */
+  :root {
+    --violeta: #7b76b9;
+    --violeta-oscuro: #666199;
+    --gris-50: #f9fafb;
+    --gris-100: #f3f4f6;
+    --gris-200: #e5e7eb;
+    --gris-300: #d1d5db;
+    --gris-400: #9ca3af;
+    --gris-500: #6b7280;
+    --gris-700: #374151;
+    --gris-800: #1f2937;
+  }
+
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font: 13px Arial, Helvetica, sans-serif;
+    color: var(--gris-700);
+    background: var(--gris-100);
+  }
+
+  /* El escenario es del tamaño de la ventana a proposito: el renderer calcula la escala
+     y el desplazamiento contra window.innerWidth/innerHeight, asi que cualquier caja mas
+     chica mentiria sobre donde queda el borde de la pantalla. */
+  #escenario { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+
+  #panel {
+    position: fixed; top: 16px; left: 16px; width: 430px; max-height: calc(100% - 32px);
+    overflow: auto; z-index: 20000;
+    background: #fff;
+    border: 1px solid var(--gris-200);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
+  }
+
+  header {
+    background: var(--gris-50);
+    border-bottom: 1px solid var(--gris-200);
+    padding: 12px 16px;
+  }
+  h1 { font-size: 14px; font-weight: 500; color: var(--gris-800); margin: 0; }
+  p.lead { margin: 3px 0 0; font-size: 11px; color: var(--gris-500); }
+
+  #cuerpo { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  fieldset {
+    border: 0; margin: 0; padding: 10px 12px;
+    background: var(--gris-50);
+    border-radius: 8px;
+  }
+  legend {
+    padding: 0; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--gris-700);
+  }
+
+  label { display: inline-flex; align-items: center; gap: 5px; margin: 0 12px 5px 0; }
+  .efectos label { text-transform: capitalize; }
+  .fila { display: flex; flex-wrap: wrap; gap: 8px 10px; }
+  .fila label { flex-direction: column; align-items: flex-start; gap: 3px; font-size: 11px; color: var(--gris-500); }
+
+  input, select {
+    font: inherit; color: var(--gris-700);
+    background: #fff;
+    border: 1px solid var(--gris-300);
+    border-radius: 6px;
+    padding: 5px 7px;
+  }
+  input:focus, select:focus { outline: 0; border-color: var(--violeta); box-shadow: 0 0 0 2px rgba(123, 118, 185, .35); }
+  input[type=number] { width: 72px; }
+  input[type=checkbox] { accent-color: var(--violeta); width: 14px; height: 14px; padding: 0; }
+
+  .acciones { display: flex; gap: 8px; }
+  button {
+    font: inherit; cursor: pointer;
+    color: var(--gris-700); background: #fff;
+    border: 1px solid var(--gris-300); border-radius: 6px;
+    padding: 7px 14px;
+  }
+  button:hover { background: var(--gris-50); }
+  button.principal { color: #fff; background: var(--violeta); border-color: var(--violeta); }
+  button.principal:hover { background: var(--violeta-oscuro); }
+
+  pre {
+    margin: 0; font: 11px ui-monospace, monospace; color: var(--gris-700);
+    background: var(--gris-50); border: 1px solid var(--gris-200);
+    border-radius: 8px; padding: 10px; white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+  <div id="escenario"></div>
+  <div id="panel">
+    <header>
+      <h1>Editor de efectos</h1>
+      <p class="lead">El arte es el splash del cliente, con el mismo motor que corre en los equipos.</p>
+    </header>
+    <div id="cuerpo">
+      <div id="controles"></div>
+      <pre id="json"></pre>
+    </div>
+  </div>
+  <script type="module" src="/src/dev/fx-lab.ts"></script>
+</body>
+</html>

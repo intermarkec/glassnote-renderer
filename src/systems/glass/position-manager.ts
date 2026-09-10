@@ -38,17 +38,19 @@ export class PositionManager {
   }
 
   /**
-   * Posiciona un elemento basado en la posición especificada
-   * @param element - Elemento a posicionar
-   * @param position - Posición con h y v
+   * El left/top y el translate que dejan el contenido pegado a su ancla.
+   *
+   * El translate sale aparte porque los efectos de entrada y salida se agregan DESPUES de
+   * el, sobre el mismo `transform`: `translate(pos) scale(s)` crece desde el ancla y
+   * `scale(s) translate(pos)` ademas se corre. Ver glass/fx/animador.ts.
    */
-  positionElement(element: HTMLElement, position: Position): void {
+  getPositionStyles(position: Position): { left: string; top: string; transform: string } {
     const pos = this.getPositionStrings(position);
-    
+
     let left = '50%';
     let top = '50%';
     let transform = 'translate(-50%, -50%)';
-    
+
     if (pos.h === 'left') {
       left = '0';
       transform = 'translate(0, -50%)';
@@ -56,7 +58,7 @@ export class PositionManager {
       left = '100%';
       transform = 'translate(-100%, -50%)';
     }
-    
+
     if (pos.v === 'top') {
       top = '0';
       transform = transform.replace('translate(-50%, -50%)', 'translate(-50%, 0)')
@@ -68,10 +70,21 @@ export class PositionManager {
           .replace('translate(0, -50%)', 'translate(0, -100%)')
           .replace('translate(-100%, -50%)', 'translate(-100%, -100%)');
     }
-    
-    element.style.left = left;
-    element.style.top = top;
-    element.style.transform = transform + ' translateZ(0)';
+
+    return { left: left, top: top, transform: transform };
+  }
+
+  /**
+   * Posiciona un elemento basado en la posición especificada
+   * @param element - Elemento a posicionar
+   * @param position - Posición con h y v
+   */
+  positionElement(element: HTMLElement, position: Position): void {
+    const estilos = this.getPositionStyles(position);
+
+    element.style.left = estilos.left;
+    element.style.top = estilos.top;
+    element.style.transform = estilos.transform + ' translateZ(0)';
   }
 
   /**

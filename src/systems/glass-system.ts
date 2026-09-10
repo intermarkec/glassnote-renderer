@@ -4,6 +4,7 @@ import { SVGProcessor } from './glass/svg-processor';
 import { ImageProcessor } from './glass/image-processor';
 import { ConfirmationButton } from './glass/confirmation-button';
 import { FileLoader } from './glass/file-loader';
+import { animarFase, normalizarTransicion, Transicion } from './glass/fx';
 import { serviceRegistry } from '../services/registry';
 import { IWindowVisibility } from '../services/interfaces';
 
@@ -40,14 +41,29 @@ class Glass {
   // Lo bajaron desde el servidor (el mensaje se desactivo). No es un final normal: no
   // se avisa SUCCESS, porque no se llego a ver lo que el mensaje pedia.
   public retirado: boolean = false;
+  /** Efectos de entrada y salida ya normalizados. Ver glass/fx/README.md. */
+  private transicion: Transicion;
+  /** El translate del ancla, al que los efectos le agregan lo suyo. */
+  private transformBase: string = '';
+  /** La opacidad con la que se queda el glass puesto: la transparencia del mensaje. */
+  private opacidadFinal: number = 1;
 
   constructor(url: string | null, message: any) {
     this.url = url || ''
     this.message = message
+    this.transicion = normalizarTransicion(message?.data?.transition);
+    this.opacidadFinal = this._leerTransparencia(message?.data?.transparency);
     this.positionManager = new PositionManager();
     this.img = document.createElement('div'); // Crear un elemento temporal
     this.activeConnections = window.activeConnections || new Map();
     this.handleGlassDisplay()
+  }
+
+  /** La transparencia viaja como texto y puede no venir. Fuera de rango no significa nada. */
+  private _leerTransparencia(valor: any): number {
+    const numero = typeof valor === 'string' ? parseFloat(valor) : valor
+    if (typeof numero !== 'number' || !isFinite(numero) || numero <= 0 || numero > 1) return 1
+    return numero
   }
 
   private handleGlassDisplay(): void {
@@ -150,8 +166,8 @@ class Glass {
               self.element.appendChild(glassContent)
               document.body.appendChild(self.element)
               self.sonarAviso()
-              self.startFadeIn(glassContent)
               self._finalizeGlassSetup(glassContent, data)
+              self.animarEntrada(glassContent, data)
             }
         })
         .catch((e) => {
@@ -161,21 +177,30 @@ class Glass {
   }
 
   private _finalizeGlassSetup(glassContent: HTMLElement, data: any): void {
-    const position = JSON.parse(data.position || '{"h":1,"v":1}');
     const askConfirmation = data.askConfirmation === true;
     const isForm = this._isFormContent(glassContent);
 
-    if (!askConfirmation) {
-      // Configurar timeout de duración solo si no es formulario
-      if (!isForm && data.duration) {
-        this.durationTimeout = setTimeout(() => {
-          this.finishGlass();
-        }, data.duration * 1000);
-      }
-    } else {
-      // Si ya tiene confirmación, agregar el botón independientemente de si es formulario
-      this.confirmButton = new ConfirmationButton(this, position);
+    // El reloj de duracion arranca aca y no al terminar la entrada: es lo que hacia el
+    // fundido de siempre, y moverlo cambiaria la exposicion de todos los mensajes que ya
+    // estan cargados.
+    if (!askConfirmation && !isForm && data.duration) {
+      this.durationTimeout = setTimeout(() => {
+        this.finishGlass();
+      }, data.duration * 1000);
     }
+  }
+
+  /**
+   * El boton de confirmacion se coloca midiendo donde quedo el arte, y durante la entrada
+   * el arte todavia se esta moviendo: puesto antes, la X queda clavada donde el glass
+   * estaba a mitad de camino. Por eso se arma recien cuando la entrada termino.
+   */
+  private _armarBotonDeConfirmacion(data: any): void {
+    if (this.isFinishing || !this.element) return;
+    if (data.askConfirmation !== true) return;
+
+    const position = JSON.parse(data.position || '{"h":1,"v":1}');
+    this.confirmButton = new ConfirmationButton(this, position);
   }
 
   private _isFormContent(glassContent: HTMLElement): boolean {
@@ -224,9 +249,10 @@ class Glass {
     
     Object.assign(glassContent.style, {
       position: 'absolute',
+      // Arranca invisible y sigue invisible hasta que el motor de efectos toma el mando:
+      // asi no se ve un cuadro del arte en su sitio antes de que empiece la entrada.
       opacity: '0',
-      transition: 'opacity 1s ease-in-out',
-      willChange: 'transform, opacity',
+      willChange: 'transform, opacity, filter, clip-path',
       transform: 'translateZ(0)',
       zIndex: '10001'
     })
@@ -240,6 +266,9 @@ class Glass {
       this.positionManager.positionElement(glassContent, position);
       const pos = this.positionManager.getPositionStrings(position);
       glassContent.style.transformOrigin = pos.hOrigin + ' ' + pos.vOrigin;
+      // Los efectos escriben el transform entero, asi que necesitan el translate del
+      // ancla para volver a ponerlo delante de lo suyo en cada cuadro.
+      this.transformBase = this.positionManager.getPositionStyles(position).transform;
     } catch (error) {
       console.error('Error setting up positioning:', error);
       // Fallback to center positioning
@@ -247,25 +276,40 @@ class Glass {
       glassContent.style.top = '50%';
       glassContent.style.transform = 'translate(-50%, -50%)';
       glassContent.style.transformOrigin = 'center center';
+      this.transformBase = 'translate(-50%, -50%)';
     }
   }
 
-  private startFadeIn(glassContent: HTMLElement): void {
-    const startFadeIn = () => {
+  /**
+   * La entrada.
+   *
+   * Espera a que el arte tenga medidas antes de arrancar: un `slide` necesita saber que
+   * tan lejos esta el borde de la pantalla, y sobre un elemento de 0x0 el calculo daria
+   * cualquier cosa. El aviso de `displayed` sale cuando la entrada termino de verdad, no
+   * al segundo fijo de antes, porque ahora la entrada dura lo que diga el mensaje.
+   */
+  private animarEntrada(glassContent: HTMLElement, data: any): void {
+    const arrancar = () => {
+      if (this.isFinishing) return
+
       const contentRect = glassContent.getBoundingClientRect()
-      if (contentRect.width > 0 && contentRect.height > 0) {
-        glassContent.style.opacity = this.message.data.transparency || '1'
-        // Send displayed notification after fade-in completes
-        setTimeout(() => {
-          this._sendNotification('displayed')
-        }, 1000) // Wait for fade-in transition to complete (1s)
-      } else {
-        requestAnimationFrame(startFadeIn)
+      if (contentRect.width <= 0 || contentRect.height <= 0) {
+        requestAnimationFrame(arrancar)
+        return
       }
+
+      animarFase(glassContent, this.transicion.in, 'entrada', {
+        transformBase: this.transformBase,
+        opacidadFinal: this.opacidadFinal
+      }).then(() => {
+        if (this.isFinishing) return
+        this._sendNotification('displayed')
+        this._armarBotonDeConfirmacion(data)
+      })
     }
 
     setTimeout(() => {
-      requestAnimationFrame(startFadeIn)
+      requestAnimationFrame(arrancar)
     }, 50)
   }
 
@@ -290,17 +334,20 @@ class Glass {
     }
     
     const glassContent = this.element.querySelector('.glass-content') as HTMLElement
-    if (glassContent) {
-      // Start fade out animation
-      glassContent.style.opacity = '0'
-      
-      // Wait for fade out to complete before cleanup
-      setTimeout(() => {
-        this.cleanup()
-      }, 1000)
-    } else {
+    if (!glassContent) {
       this.cleanup()
+      return
     }
+
+    // La entrada, si seguia corriendo, la corta el propio motor: mira antes donde estaba
+    // el arte para que la salida siga desde ahi. Cortarla aca seria peor, porque entonces
+    // lo que mediria es el estilo escrito —el de partida— y el arte pegaria un salto.
+    animarFase(glassContent, this.transicion.out, 'salida', {
+      transformBase: this.transformBase,
+      opacidadFinal: this.opacidadFinal
+    }).then(() => {
+      this.cleanup()
+    })
   }
 
   private _sendNotification(eventType: string, responseData?: any): void {

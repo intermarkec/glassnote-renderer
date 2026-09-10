@@ -2,6 +2,7 @@ import { GlassData } from '../utils/global'
 import { serviceRegistry } from '../services/registry'
 import { IWindowVisibility } from '../services/interfaces'
 import { esPreview } from '../utils/preview'
+import { transicionAlAzar } from './glass/fx'
 
 /**
  * Get the window visibility service
@@ -328,6 +329,10 @@ document.addEventListener('DOMContentLoaded', function() {
           // Sin transparencia. Ojo: este campo ES la opacidad del glass, no cuánto se
           // transparenta: con '0' el splash sería invisible.
           transparency: '1',
+          // Entra y sale distinto cada vez. Es el saludo de arranque: no tiene por qué ser
+          // siempre el mismo, y ademas deja ver los efectos funcionando en una pantalla de
+          // verdad cada vez que un equipo arranca. Ver glass/fx/azar.ts.
+          transition: transicionAlAzar(),
           isUserDevice: false,
           needPresent: false,
           askConfirmation: false,
