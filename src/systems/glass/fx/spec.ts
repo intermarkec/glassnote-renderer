@@ -9,12 +9,15 @@
  * nombre de un efecto.
  */
 
+import { unaFasePresentable } from './presentables'
 import { FaseTransicion, Lado, NombreEfecto, Transicion } from './tipos'
 
-const EFECTOS: NombreEfecto[] = ['fade', 'zoom', 'slide', 'roll', 'spin', 'blur', 'wipe', 'iris']
+const EFECTOS: NombreEfecto[] = ['random', 'fade', 'zoom', 'slide', 'roll', 'spin', 'blur', 'wipe', 'iris']
 
 /** Nombres alternativos. El de la izquierda es lo que alguien puede escribir. */
 const ALIAS: Record<string, NombreEfecto> = {
+  azar: 'random',
+  aleatorio: 'random',
   fadein: 'fade',
   fadeout: 'fade',
   fundido: 'fade',
@@ -149,6 +152,15 @@ export function normalizarFase(valor: any): FaseTransicion {
   }
 
   const leido = leerEfectos(valor.effects !== undefined ? valor.effects : valor.efectos)
+
+  // `random` no es un efecto: es un sorteo, y se resuelve aca. Gana sobre lo que venga al
+  // lado —no tendria sentido combinar "cualquier cosa" con algo en particular— y se
+  // sortea en cada normalizacion, o sea una vez por glass: el mismo mensaje entra
+  // distinto cada vez que se muestra.
+  if (leido.efectos.indexOf('random') !== -1) {
+    return normalizarFase(unaFasePresentable())
+  }
+
   const ladoDeclarado = leerLado(valor.side !== undefined ? valor.side : valor.lado)
   const giro = valor.spin !== undefined ? valor.spin : valor.giro
 

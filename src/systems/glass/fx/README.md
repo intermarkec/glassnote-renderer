@@ -43,9 +43,15 @@ no dijo nada de la salida espera que se vaya con el mismo zoom, no con un fundid
 | `blur` | desenfoque | `blur` (`12`) |
 | `wipe` | cortinilla: se revela por un lado sin que el arte se mueva | `side` (`l`) |
 | `iris` | lo mismo pero en circulo, desde el centro | — |
+| `random` | sortea una combinacion de la lista presentable | — |
 
 `wipe` e `iris` usan los dos el mismo `clip-path`: juntos en una misma fase no se suman,
 gana `iris`. Cualquier otra combinacion si se suma.
+
+`random` no es un efecto sino un sorteo, y por eso no se combina: puesto al lado de otro,
+gana el. Se resuelve al normalizar —o sea una vez por glass— asi que **el mismo mensaje
+entra distinto cada vez que se muestra**, y la entrada y la salida se sortean por separado.
+Sale de `fx/presentables.ts`, la misma lista que usa el splash.
 
 El lado tambien se puede escribir pegado al nombre —`"slide-l"`, `"wipe-arriba"`— para no
 tener que agregar un campo. El campo `side` le gana al sufijo.
@@ -103,10 +109,14 @@ mensajes que ya estan cargados.
 ## El splash entra distinto cada vez
 
 El saludo de arranque (`dom-events.ts`, `showSplash`) sortea su entrada y su salida por
-separado con `transicionAlAzar()`. El sorteo sale de una lista curada —`fx/azar.ts`— y no
-de combinar efectos al voleo: `spin` con `iris`, o un giro de 360 grados sobre un arte
+separado con `transicionAlAzar()`, que es lo mismo que consigue un mensaje pidiendo el
+efecto `random`. Las dos puertas dan a la misma lista curada, `fx/presentables.ts`, que no
+es una combinacion al voleo: `spin` con `iris`, o un giro de 360 grados sobre un arte
 grande, salen mal. Cada entrada de esa lista es una fase entera, porque lo que hace que un
 efecto quede bien son los tres valores juntos —efectos, duracion y curva—, no el nombre.
+
+Vive en su propio archivo, sin importar nada, para que la lean `spec.ts` —que resuelve
+`random`— y `azar.ts` sin importarse en circulo.
 
 Es la misma lista que ofrece el panel al armar un mensaje: si se agrega un efecto bueno hay
 que agregarlo en los dos lados, que son repos distintos y no comparten codigo.

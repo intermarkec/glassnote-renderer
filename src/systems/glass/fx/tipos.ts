@@ -8,8 +8,15 @@
  * y no hay un "fadein" y un "fadeout" distintos: `fade` en `in` entra y en `out` sale.
  */
 
-/** Efectos que entiende el motor. Se pueden combinar dentro de una misma fase. */
+/**
+ * Efectos que entiende el motor. Se pueden combinar dentro de una misma fase.
+ *
+ * `random` es la excepcion: no se combina con nada porque no es un efecto sino un sorteo.
+ * Se resuelve al normalizar —la fase entera se reemplaza por una de la lista presentable—
+ * asi que nunca llega al animador.
+ */
 export type NombreEfecto =
+  | 'random'
   | 'fade'
   | 'zoom'
   | 'slide'
