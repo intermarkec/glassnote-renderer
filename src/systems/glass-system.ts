@@ -87,13 +87,19 @@ class Glass {
   }
 
   private displayGlass(): void {
-    // Play glass sound using service
+    this.initialize()
+  }
+
+  /**
+   * El aviso sonoro. Suena cuando el mensaje YA esta en pantalla, no cuando se lo empieza
+   * a armar: el contenido se carga (una imagen, un SVG, un html con sus fuentes) y en un
+   * arte pesado eso tarda, con lo cual el sonido llegaba primero y se veia desincronizado.
+   */
+  private sonarAviso(): void {
     const soundSystem = serviceRegistry.get<any>('soundSystem');
     if (soundSystem && typeof soundSystem.playGlassSound === 'function') {
       soundSystem.playGlassSound();
     }
-
-    this.initialize()
   }
 
   private initialize(): void {
@@ -122,8 +128,19 @@ class Glass {
     
     // Add content based on message type
     const data = this.message.data;
-    const uploads = JSON.parse(data.uploads);
+    const uploads = JSON.parse(data.uploads || '[]');
     const upload = uploads[0];
+
+    // Sin archivo no hay nada que mostrar. Se corta aca: antes reventaba al pedirle el
+    // mimetype a algo que no existe, y para entonces ya habia sonado el aviso. Tampoco se
+    // avisa nada al servidor: mostrar la nada no es haber cumplido.
+    if (!upload) {
+      console.warn('Glass sin archivos, no hay nada que mostrar. id:', data.id)
+      this.retirado = true
+      this.cleanup()
+      return
+    }
+
     const processor = this._getContentProcessor(upload.mimetype, data);
 
     processor.process(glassContent, data, upload)
@@ -132,6 +149,7 @@ class Glass {
             if (self.element) {
               self.element.appendChild(glassContent)
               document.body.appendChild(self.element)
+              self.sonarAviso()
               self.startFadeIn(glassContent)
               self._finalizeGlassSetup(glassContent, data)
             }
