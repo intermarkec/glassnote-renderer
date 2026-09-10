@@ -316,7 +316,10 @@ document.addEventListener('DOMContentLoaded', function() {
           messageId: 'preview-6635', // Add messageId for duplicate detection
           type: 'PREVIEW',
           uploads: '[{"id":"3ad42722-742a-442a-af8d-429f638bbf00","path":"splash.svg","mimetype":"image/svg+xml"}]',
-          position: '{"h":1,"v":1}',
+          // Abajo a la derecha: es un saludo al arrancar, no tiene por que plantarse en
+          // el medio de la pantalla. (h: 0 izquierda, 1 centro, 2 derecha · v: 0 arriba,
+          // 1 medio, 2 abajo)
+          position: '{"h":2,"v":2}',
           duration: 5,
           transparency: '0.80',
           isUserDevice: false,
