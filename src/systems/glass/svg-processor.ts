@@ -6,6 +6,9 @@ import { SvgTextEngine, SvgParam, NewsRequest } from './svg/index';
 /** Píxeles por segundo que corresponden al 100% del control de velocidad. */
 const VELOCIDAD_MAXIMA = 600;
 
+/** Hasta dónde llega el control del editor: el 100% es la referencia, no el techo. */
+const PORCENTAJE_MAXIMO = 150;
+
 // Cuanto vale en px una unidad absoluta de CSS. El SVG de Inkscape trae el tamano en
 // milimetros —`width="508mm"`— y un parseFloat pelado se queda con el 508 y tira la
 // unidad, asi que un arte pensado para 1920 px se dibujaba de 508 y ocupaba un cuarto de
@@ -359,7 +362,10 @@ export class SVGProcessor {
   private _velocidadEnPixeles(valor: string | undefined): number {
     const porcentaje = valor !== undefined ? parseFloat(valor) : NaN;
     if (!isFinite(porcentaje)) return VELOCIDAD_MAXIMA / 2;
-    return (Math.max(0, Math.min(100, porcentaje)) / 100) * VELOCIDAD_MAXIMA;
+    // El tope es 150 y no 100: el control del editor llega hasta ahí, o sea que el 100%
+    // no es el máximo sino la referencia. Por abajo se admite el 0 aunque el editor ya no
+    // lo ofrezca, porque puede venir de un mensaje viejo o de la API.
+    return (Math.max(0, Math.min(PORCENTAJE_MAXIMO, porcentaje)) / 100) * VELOCIDAD_MAXIMA;
   }
 
   private _findParameter(parameters: any[], label: string): any {
