@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import './style.css'
+// La tipografia de la marca, embebida: la usan el splash y el arte SVG de los mensajes.
+import './fonts/kinetika.css'
 
 // Import service infrastructure
 import { serviceRegistry } from './services/registry'

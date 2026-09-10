@@ -1,4 +1,8 @@
 import { ScaleCalculator } from './scale-calculator';
+// El CSS de la fuente como TEXTO: un iframe es otro documento y no hereda las @font-face
+// del padre, asi que hay que metersela adentro. `?inline` hace que vite lo entregue como
+// string en vez de inyectarlo en la pagina.
+import kinetikaCss from '../../fonts/kinetika.css?inline';
 import { FileLoader } from './file-loader';
 import { serviceRegistry } from '../../services/registry';
 import { IPassthroughService } from '../../services/interfaces';
@@ -486,6 +490,7 @@ export class HTMLProcessor {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' 'unsafe-eval' 'self'; style-src 'unsafe-inline' 'self'; default-src 'self' data: blob:;">
+    <style>${kinetikaCss}</style>
     <style>
         body, html {
             margin: 0 !important;
