@@ -50,7 +50,7 @@ export interface NewsResult {
 /** Separacion entre el final de una copia y el principio de la siguiente, en ems. */
 const GAP_EM = 4
 
-/** Velocidad de reserva si el parametro viene vacio. En cero NO se usa: cero es quieto. */
+/** Velocidad de reserva si el parametro viene vacio o en cero. */
 const DEFAULT_SPEED = 50
 
 /** Tope de copias, por si una plantilla pide un texto minusculo en una ventana enorme. */
@@ -92,9 +92,6 @@ export class NewsTicker {
     const trackId = 'gn-news-track-' + suffix
     const animName = 'gn-news-anim-' + suffix
 
-    // Cero es QUIETO, no "sin dato": el que puso 0% en el editor pidió que no se moviera.
-    // Sólo se cae a la de reserva cuando no vino ningún valor.
-    const detenido = request.speed === 0
     const speed = request.speed > 0 ? request.speed : DEFAULT_SPEED
     const gap = composed.lineHeight * GAP_EM
     const step = composed.width + gap
@@ -175,23 +172,13 @@ export class NewsTicker {
     parent.replaceChild(outer, area.element)
 
     if (framed) this._addClip(root, clipId, frame)
+    this._addAnimation(root, animName, trackId, from, to, duration, request.loop)
 
-    // Quieto: se compone y se recorta igual —el texto queda donde el arte lo puso— pero
-    // sin animación. Y sin animación no hay final que avisar: el glass se va por su
-    // duración, como cualquier otro.
-    if (!detenido) {
-      this._addAnimation(root, animName, trackId, from, to, duration, request.loop)
-      if (!request.loop && request.onFinish) {
-        this._onEnd(track, request.onFinish)
-      }
+    if (!request.loop && request.onFinish) {
+      this._onEnd(track, request.onFinish)
     }
 
-    return {
-      applied: true,
-      width: composed.width,
-      duration: detenido ? 0 : duration,
-      copies: copies,
-    }
+    return { applied: true, width: composed.width, duration: duration, copies: copies }
   }
 
   /**

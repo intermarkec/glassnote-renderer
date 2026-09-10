@@ -3,9 +3,6 @@ import { asegurarFuentes, familiasQuePide, origenDeFuentes } from '../../service
 import { FileLoader } from './file-loader';
 import { SvgTextEngine, SvgParam, NewsRequest } from './svg/index';
 
-/** Píxeles por segundo que corresponden al 100% del control de velocidad. */
-const VELOCIDAD_MAXIMA = 600;
-
 // Cuanto vale en px una unidad absoluta de CSS. El SVG de Inkscape trae el tamano en
 // milimetros —`width="508mm"`— y un parseFloat pelado se queda con el 508 y tira la
 // unidad, asi que un arte pensado para 1920 px se dibujaba de 508 y ocupaba un cuarto de
@@ -327,13 +324,14 @@ export class SVGProcessor {
 
       const speedParam = this._findParameter(parameters, '%SPEED%');
       const loopParam = this._findParameter(parameters, '%LOOP%');
+      const speed = speedParam ? parseFloat(speedParam.value) : NaN;
       const self = this;
 
       return {
         label: '%NEWS%',
         // Se conserva el formato de siempre: guion delante y las noticias encadenadas.
         text: '- ' + String(newsParam.value).replace(/\n/g, '  - '),
-        speed: this._velocidadEnPixeles(speedParam ? speedParam.value : undefined),
+        speed: isFinite(speed) && speed > 0 ? speed : 50,
         loop: loopParam ? String(loopParam.value) !== 'false' : true,
         glassId: String(data.id),
         onFinish: function () {
@@ -344,22 +342,6 @@ export class SVGProcessor {
       console.error('[svg] no se pudo leer la noticia:', error);
       return undefined;
     }
-  }
-
-  /**
-   * El editor guarda %SPEED% como un PORCENTAJE (0 a 100), no como píxeles por segundo.
-   * Antes se usaba el número tal cual, y eso dejaba la marquesina inservible: al 50 —el
-   * valor por defecto— un texto de noticias normal tardaba 149 segundos en cruzar una
-   * pantalla de 1920, o sea que con la duración habitual del mensaje nunca se lo veía
-   * pasar y mover el control no cambiaba nada apreciable.
-   *
-   * Ahora el 100% son VELOCIDAD_MAXIMA px/s: ese mismo texto cruza en unos 12 segundos.
-   * Y el 0% es quieto, que es lo que cualquiera entiende al ver un cero.
-   */
-  private _velocidadEnPixeles(valor: string | undefined): number {
-    const porcentaje = valor !== undefined ? parseFloat(valor) : NaN;
-    if (!isFinite(porcentaje)) return VELOCIDAD_MAXIMA / 2;
-    return (Math.max(0, Math.min(100, porcentaje)) / 100) * VELOCIDAD_MAXIMA;
   }
 
   private _findParameter(parameters: any[], label: string): any {
