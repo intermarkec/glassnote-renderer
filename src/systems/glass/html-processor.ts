@@ -3,6 +3,7 @@ import { ScaleCalculator } from './scale-calculator';
 // del padre, asi que hay que metersela adentro. `?inline` hace que vite lo entregue como
 // string en vez de inyectarlo en la pagina.
 import kinetikaCss from '../../fonts/kinetika.css?inline';
+import { asegurarFuentes, familiasQuePide, origenDeFuentes } from '../../services/fuentes';
 import { FileLoader } from './file-loader';
 import { serviceRegistry } from '../../services/registry';
 import { IPassthroughService } from '../../services/interfaces';
@@ -36,17 +37,19 @@ export class HTMLProcessor {
     try {
       const htmlContentPromise = this._extractHtmlFromParameters(data);
       
-      if (htmlContentPromise instanceof Promise) {
-        const htmlContent = await htmlContentPromise;
-        const processedHtml = this._processVariables(htmlContent, data);
-        return this._createIframeElement(glassContent, processedHtml, data);
-      } else {
-        const processedHtml = this._processVariables(htmlContentPromise, data);
-        if (!processedHtml || processedHtml.trim() === '') {
-          return Promise.resolve();
-        }
-        return this._createIframeElement(glassContent, processedHtml, data);
+      const htmlContent = htmlContentPromise instanceof Promise ? await htmlContentPromise : htmlContentPromise;
+      const processedHtml = this._processVariables(htmlContent, data);
+      if (!processedHtml || processedHtml.trim() === '') {
+        return Promise.resolve();
       }
+      // Las tipografías que pida este html, bajadas sólo si hacen falta. Vuelven en CSS
+      // con la fuente en base64: el iframe no hereda las del padre y su CSP no lo deja
+      // salir a buscarlas.
+      const cssDeFuentes = await asegurarFuentes(
+        familiasQuePide(processedHtml),
+        origenDeFuentes(data?.baseUrl),
+      );
+      return this._createIframeElement(glassContent, processedHtml, data, cssDeFuentes);
     } catch (htmlError) {
       console.error('Error extracting HTML from parameters:', htmlError);
       throw htmlError;
@@ -108,7 +111,7 @@ export class HTMLProcessor {
     return processedHtml;
   }
 
-  private _createIframeElement(glassContent: HTMLElement, htmlContent: string, data: any): Promise<void> {
+  private _createIframeElement(glassContent: HTMLElement, htmlContent: string, data: any, cssDeFuentes: string = ''): Promise<void> {
     const self = this;
     
     const tempDiv = document.createElement('div');
@@ -165,7 +168,7 @@ export class HTMLProcessor {
     iframe.style.border = 'none';
     iframe.style.pointerEvents = 'auto';
     
-    iframe.srcdoc = this._wrapHtmlInSafeDocument(htmlContent, dimensions.ratio, dimensions.width, dimensions.height);
+    iframe.srcdoc = this._wrapHtmlInSafeDocument(htmlContent, dimensions.ratio, dimensions.width, dimensions.height, cssDeFuentes);
 
     glassContent.appendChild(iframe);
     
@@ -177,7 +180,7 @@ export class HTMLProcessor {
     return Promise.resolve();
   }
 
-  private _wrapHtmlInSafeDocument(htmlContent: string, scaleFactor: number, originalWidth: number, originalHeight: number): string {
+  private _wrapHtmlInSafeDocument(htmlContent: string, scaleFactor: number, originalWidth: number, originalHeight: number, cssDeFuentes: string = ''): string {
     const tempContainer = document.createElement('div');
     tempContainer.innerHTML = htmlContent;
 
@@ -491,6 +494,7 @@ export class HTMLProcessor {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' 'unsafe-eval' 'self'; style-src 'unsafe-inline' 'self'; default-src 'self' data: blob:;">
     <style>${kinetikaCss}</style>
+    <style>${cssDeFuentes}</style>
     <style>
         body, html {
             margin: 0 !important;

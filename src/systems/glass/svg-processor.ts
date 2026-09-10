@@ -1,4 +1,5 @@
 import { ScaleCalculator } from './scale-calculator';
+import { asegurarFuentes, familiasQuePide, origenDeFuentes } from '../../services/fuentes';
 import { FileLoader } from './file-loader';
 import { SvgTextEngine, SvgParam, NewsRequest } from './svg/index';
 
@@ -58,6 +59,9 @@ export class SVGProcessor {
 
     try {
       const svgContent = await FileLoader.loadText(svgUrl);
+      // Las tipografías ANTES de dibujar: el motor de texto mide para acomodar y reducir,
+      // y midiendo con la fuente equivocada acomoda para una que no es la que se va a ver.
+      await asegurarFuentes(familiasQuePide(svgContent), origenDeFuentes(data?.baseUrl));
       await this._createSvgElement(glassContent, svgContent, data);
     } catch (svgError) {
       console.error('Error processing SVG:', svgError);
