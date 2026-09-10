@@ -1,11 +1,14 @@
-<!-- Generado desde "Splash 2026.svg". Dos cosas que parecen detalles y no lo son:
+<!-- Generado desde "Splash 2026.svg". Tres cosas del armado que no se ven:
      · el SVG va INLINE y no dentro de un <img>, porque así el renderer le sustituye
-       %VERSION%, que dentro de una imagen no vería;
-     · el div raíz lleva ancho Y ALTO en píxeles (360x266, la proporción del
-       arte): el procesador de HTML mide el glass con esos dos valores y sin el alto
-       no dibuja nada. -->
-<div style="width: 360px; height: 266px;">
-<svg style="width:100%;height:100%;display:block" version="1.1" id="Layer_1" xmlns:x="&ns_extend;" xmlns:i="&ns_ai;" xmlns:graph="&ns_graphs;"
+       %VERSION%, que dentro de una imagen no vería (y va en blanco a mano: el arte
+       la traía en violeta y sobre ese fondo no se leía);
+     · el div raíz lleva ancho Y ALTO en píxeles (432x420): el procesador de
+       HTML mide el glass con esos dos valores y sin el alto no dibuja nada;
+     · de ese alto, 100px son aire abajo del arte. El glass va pegado a la esquina
+       de abajo a la derecha, así que ese hueco transparente es lo que lo despega del
+       borde de la pantalla. -->
+<div style="width: 432px; height: 420px;">
+<svg style="width:100%;height:320px;display:block" version="1.1" id="Layer_1" xmlns:x="&ns_extend;" xmlns:i="&ns_ai;" xmlns:graph="&ns_graphs;"
 	 xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 441.19 326.3"
 	 style="enable-background:new 0 0 441.19 326.3;" xml:space="preserve">
 <style type="text/css">
@@ -160,7 +163,7 @@
 <path class="st2" d="M323,256.22H156.77c-0.83,0-1.65,0.24-2.33,0.7l-30.94,20.44c-3.04,2.01-7.1-0.55-6.36-4.02l2.57-12.16
 	c0.51-2.41-1.39-4.68-3.97-4.71l-16.72-0.24c-18.29,0-33.11-16.8-33.11-34.3V120.47c0-19.3,3.78-25.95,22.36-31.8
 	c0.7-0.22,1.41-0.38,2.13-0.48L323,51.28c48.32-3.26,37.22,47.01,37.22,66.69V220.6C360.22,240.27,343.55,256.22,323,256.22z"/>
-<text transform="matrix(1.0479 0 0 1 149.8071 236.9261)" class="st3 st4 st5">%VERSION%</text>
+<text transform="matrix(1.0479 0 0 1 149.8071 236.9261)" class="st4 st5" fill="#ffffff">%VERSION%</text>
 <g>
 	<g>
 		<g>

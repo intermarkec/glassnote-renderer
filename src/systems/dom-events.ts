@@ -321,7 +321,9 @@ document.addEventListener('DOMContentLoaded', function() {
           // 1 medio, 2 abajo)
           position: '{"h":2,"v":2}',
           duration: 5,
-          transparency: '0.80',
+          // Sin transparencia. Ojo: este campo ES la opacidad del glass, no cuánto se
+          // transparenta: con '0' el splash sería invisible.
+          transparency: '1',
           isUserDevice: false,
           needPresent: false,
           askConfirmation: false,
