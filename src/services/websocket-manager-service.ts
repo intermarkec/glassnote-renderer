@@ -3,6 +3,12 @@ import { IWebSocketManager, ConnectionStatus, WebSocketMessage } from './interfa
 import { serviceRegistry } from './registry';
 import { esPreview } from '../utils/preview';
 
+interface ServerHealth {
+  firstSeenAt: number;
+  lastConnectedAt: number | null;
+  failedAttempts: number;
+}
+
 /**
  * WebSocket Manager Service
  * Handles WebSocket connections, reconnection logic, and message processing
@@ -13,8 +19,31 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
   private pingTimers: Map<string, NodeJS.Timeout> = new Map();
   private pongTimers: Map<string, NodeJS.Timeout> = new Map();
   private retryCounts: Map<string, number> = new Map();
-  private connectingServers: Map<string, boolean> = new Map();
+  private connectingServers: Map<string, number> = new Map();
   private certificateFailures: Map<string, number> = new Map();
+  // Ultima señal de vida de cada servidor: cualquier mensaje recibido, no solo el pong.
+  private lastSeenAt: Map<string, number> = new Map();
+  private watchdog: NodeJS.Timeout | null = null;
+  private lastTickAt = 0;
+
+  // El vigilante mira cada 30 s. Con un ping por minuto, 150 s sin una sola respuesta
+  // son dos pings al vacio: el socket esta muerto. Y un salto de reloj de mas de dos
+  // minutos entre dos vueltas no puede ser otra cosa que el equipo dormido o congelado.
+  private static readonly TICK_MS = 30000;
+  private static readonly SILENCE_MS = 150000;
+  private static readonly CLOCK_JUMP_MS = 120000;
+  private static readonly CONNECTING_TIMEOUT_MS = 20000;
+
+  // Salud de cada servidor de la lista, guardada en userData para que sobreviva a los
+  // reinicios: cuando se lo vio por primera vez, cuando conecto por ultima vez y cuantos
+  // intentos lleva fallados desde entonces.
+  private health: Map<string, ServerHealth> = new Map();
+  private lastPurgeAt = 0;
+
+  // Cuando se saca de la lista un servidor que nunca contesto. Ver purgeDeadServers().
+  private static readonly PURGE_AFTER_MS = 7 * 24 * 3600 * 1000;
+  private static readonly PURGE_AFTER_FAILURES = 100;
+  private static readonly PURGE_CHECK_MS = 3600000;
 
   constructor() {
     super('websocketManager');
@@ -31,13 +60,17 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     // En previsualizacion no: el renderer embebido en la web no es un equipo, no tiene
     // que aparecer conectado ni recibir los mensajes de nadie.
     if (esPreview()) return;
+    await this.loadServerHealth();
     setTimeout(() => this.autoConnectToServers(), 2000);
+    this.startWatchdog();
   }
 
   /**
    * Clean up the WebSocket manager
    */
   protected async onCleanup(): Promise<void> {
+    this.stopWatchdog();
+    
     // Close all connections
     this.activeConnections.forEach((ws, _url) => {
       ws.close();
@@ -54,6 +87,8 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     this.retryCounts.clear();
     this.connectingServers.clear();
     this.certificateFailures.clear();
+    this.lastSeenAt.clear();
+    this.health.clear();
     
     // Clear global activeConnections for backward compatibility
     if (window.activeConnections) {
@@ -69,7 +104,7 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
       return;
     }
     
-    this.connectingServers.set(url, true);
+    this.connectingServers.set(url, Date.now());
     
     // Check for existing connection
     if (this.activeConnections.has(url)) {
@@ -153,6 +188,15 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
       const ws = this.activeConnections.get(url);
       ws?.close();
     }
+    
+    // Se borran a mano en vez de esperar el onclose: cuando el socket es un zombi
+    // —justo el caso que deja al equipo sordo— ese evento no llega nunca, y mientras
+    // la entrada siga en el mapa connect() la da por buena y no reconecta.
+    this.activeConnections.delete(url);
+    if (window.activeConnections) {
+      window.activeConnections.delete(url);
+    }
+    this.connectingServers.delete(url);
     
     this.cleanupConnectionTimers(url);
     this.retryCounts.delete(url);
@@ -327,6 +371,9 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     };
     
     ws.onmessage = (event: MessageEvent) => {
+      // Cualquier mensaje cuenta como señal de vida, no solo el pong.
+      this.lastSeenAt.set(url, Date.now());
+      
       // First try to parse the message to check if it's a review response
       try {
         const message = JSON.parse(event.data);
@@ -354,6 +401,8 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     }
     
     this.retryCounts.delete(url);
+    this.lastSeenAt.set(url, Date.now());
+    this.markServerConnected(url);
     
     if (this.pingTimers.has(url)) {
       clearInterval(this.pingTimers.get(url));
@@ -381,6 +430,15 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
               ws.close();
             }, 30000)
           );
+        } else {
+          // Sin este else el intervalo se queda dando vueltas en vacio para siempre: no
+          // manda ping, no arma el pong, no cierra y nadie reconecta. El equipo queda
+          // sordo sin escribir una sola linea en el log.
+          console.warn(
+            'El socket de ' + url + ' ya no esta abierto (readyState ' +
+              ws.readyState + '); se reconecta'
+          );
+          this.forceReconnect(url);
         }
       }, 60000)
     );
@@ -396,6 +454,7 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     }
     
     this.cleanupConnectionTimers(url);
+    this.markServerFailure(url);
     this.scheduleReconnection(url, event);
   }
 
@@ -630,6 +689,236 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
       clearTimeout(this.reconnectTimers.get(url));
       this.reconnectTimers.delete(url);
     }
+    
+    this.lastSeenAt.delete(url);
+  }
+
+  // El vigilante: la unica parte que no le cree al socket.
+  //
+  // Toda la reconexion colgaba de dos hilos que tiene que tirar el propio socket: el
+  // evento onclose y el `readyState === OPEN` de su timer de ping. Cuando el equipo se
+  // suspende, el sistema se lleva la conexion por delante y el renderer despierta con un
+  // socket que ya no sirve y que nunca aviso: onclose no llega, el ping no sale, el pong
+  // no se espera y no hay reintento. El cliente sigue vivo, con su ventana abierta, y no
+  // recibe un mensaje mas hasta que alguien lo reinicia. En el log de campo eso son dos
+  // horas de silencio despues de un hueco de ochenta minutos.
+  //
+  // Por eso este reloj corre aparte y decide desde afuera: mira cuando se recibio la
+  // ultima señal de cada servidor y rehace la conexion aunque el socket jure estar sano.
+  private startWatchdog(): void {
+    if (this.watchdog) return;
+    
+    this.lastTickAt = Date.now();
+    this.watchdog = setInterval(
+      () => this.checkConnections(),
+      WebSocketManagerService.TICK_MS
+    );
+  }
+
+  private stopWatchdog(): void {
+    if (!this.watchdog) return;
+    
+    clearInterval(this.watchdog);
+    this.watchdog = null;
+  }
+
+  private checkConnections(): void {
+    const now = Date.now();
+    const drift = now - this.lastTickAt - WebSocketManagerService.TICK_MS;
+    this.lastTickAt = now;
+    
+    // setInterval no corre mientras el equipo duerme: si entre dos vueltas paso mucho mas
+    // tiempo del que debia, el equipo estuvo dormido o congelado y ninguna conexion
+    // sobrevive a eso. No se revisan una por una, se rehacen todas.
+    if (drift > WebSocketManagerService.CLOCK_JUMP_MS) {
+      console.warn(
+        'El reloj salto ~' + Math.round(drift / 60000) + ' min: el equipo estuvo dormido ' +
+          'o congelado; se rehacen todas las conexiones'
+      );
+      this.reconnectEverything();
+      return;
+    }
+    
+    if (now - this.lastPurgeAt > WebSocketManagerService.PURGE_CHECK_MS) {
+      this.lastPurgeAt = now;
+      this.purgeDeadServers().catch((error) =>
+        console.error('Error purging dead servers:', error)
+      );
+    }
+    
+    this.connectingServers.forEach((startedAt, url) => {
+      if (now - startedAt <= WebSocketManagerService.CONNECTING_TIMEOUT_MS) return;
+      
+      // La bandera de "conectando" solo se levanta con onopen o con onclose. Un socket
+      // que se cuelga al abrir sin ninguno de los dos la deja puesta para siempre, y
+      // connect() pasa a ser una funcion que no hace nada por el resto de la sesion.
+      console.warn('La conexion a ' + url + ' quedo colgada al abrir; se reintenta');
+      this.forceReconnect(url);
+    });
+    
+    this.activeConnections.forEach((ws, url) => {
+      if (ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) {
+        console.warn('El socket de ' + url + ' esta cerrado y no lo aviso; se reconecta');
+        this.forceReconnect(url);
+        return;
+      }
+      
+      const lastSeen = this.lastSeenAt.get(url);
+      if (ws.readyState !== WebSocket.OPEN || !lastSeen) return;
+      
+      const silencio = now - lastSeen;
+      if (silencio > WebSocketManagerService.SILENCE_MS) {
+        console.warn(
+          'Sin una sola respuesta de ' + url + ' desde hace ' +
+            Math.round(silencio / 1000) + ' s; se reconecta'
+        );
+        this.forceReconnect(url);
+      }
+    });
+  }
+
+  private async loadServerHealth(): Promise<void> {
+    try {
+      const userDataManager = serviceRegistry.get<any>('userDataManager');
+      const guardada = await userDataManager?.get('serverHealth');
+      if (guardada && typeof guardada === 'object') {
+        Object.entries(guardada).forEach(([url, datos]) => {
+          const salud = datos as Partial<ServerHealth>;
+          this.health.set(url, {
+            firstSeenAt: Number(salud.firstSeenAt) || Date.now(),
+            lastConnectedAt: Number(salud.lastConnectedAt) || null,
+            failedAttempts: Number(salud.failedAttempts) || 0,
+          });
+        });
+      }
+    } catch (error) {
+      // Sin historial se empieza de cero: lo unico que se pierde es la antiguedad, y de
+      // paso ningun servidor se purga antes de tiempo.
+      console.error('Error loading server health:', error);
+    }
+  }
+
+  private async saveServerHealth(): Promise<void> {
+    try {
+      const userDataManager = serviceRegistry.get<any>('userDataManager');
+      if (!userDataManager) return;
+      
+      const plano: Record<string, ServerHealth> = {};
+      this.health.forEach((salud, url) => {
+        plano[url] = salud;
+      });
+      await userDataManager.set('serverHealth', plano);
+    } catch (error) {
+      console.error('Error saving server health:', error);
+    }
+  }
+
+  private saludDe(url: string): ServerHealth {
+    let salud = this.health.get(url);
+    if (!salud) {
+      salud = { firstSeenAt: Date.now(), lastConnectedAt: null, failedAttempts: 0 };
+      this.health.set(url, salud);
+    }
+    return salud;
+  }
+
+  private markServerConnected(url: string): void {
+    const salud = this.saludDe(url);
+    salud.lastConnectedAt = Date.now();
+    salud.failedAttempts = 0;
+    this.saveServerHealth();
+  }
+
+  private markServerFailure(url: string): void {
+    const salud = this.saludDe(url);
+    salud.failedAttempts += 1;
+    this.saveServerHealth();
+  }
+
+  /**
+   * Saca de la lista un servidor que nunca contesto.
+   *
+   * La lista de servidores del equipo es acumulativa: cada alta suma una URL y no hay
+   * nada que quite ninguna. Un equipo emparejado alguna vez contra un servidor que ya no
+   * existe se queda reintentando contra el fantasma para siempre —en un log de campo son
+   * cuatrocientas lineas de error en un dia— y ademas cada vuelta del vigilante lo
+   * arrastra consigo.
+   *
+   * Las tres condiciones son deliberadamente conservadoras, porque esto BORRA
+   * configuracion del equipo:
+   *
+   *   - que no haya conectado NUNCA. Una caida, por larga que sea, deja un
+   *     lastConnectedAt y no se toca: un servidor que anduvo puede volver.
+   *   - que hayan pasado dias desde que se lo vio por primera vez.
+   *   - y que se lo haya intentado de verdad esa cantidad de veces. Sin esto, un equipo
+   *     apagado dos semanas volveria y purgaria por almanaque, sin haber probado nada.
+   *
+   * Nunca el ultimo de la lista: un equipo sin servidores no se arregla solo, hay que ir
+   * a emparejarlo de nuevo.
+   */
+  private async purgeDeadServers(): Promise<void> {
+    const userDataManager = serviceRegistry.get<any>('userDataManager');
+    if (!userDataManager || typeof userDataManager.getServers !== 'function') return;
+    
+    const servers: string[] = await userDataManager.getServers();
+    if (servers.length <= 1) return;
+    
+    const ahora = Date.now();
+    let quedan = servers.length;
+    
+    for (const url of servers) {
+      if (quedan <= 1) break;
+      
+      const salud = this.health.get(url);
+      if (!salud || salud.lastConnectedAt) continue;
+      
+      const antiguedad = ahora - salud.firstSeenAt;
+      if (antiguedad < WebSocketManagerService.PURGE_AFTER_MS) continue;
+      if (salud.failedAttempts < WebSocketManagerService.PURGE_AFTER_FAILURES) continue;
+      
+      console.warn(
+        'Se saca de la lista ' + url + ': nunca contesto en ' +
+          Math.round(antiguedad / 86400000) + ' dias y ' + salud.failedAttempts +
+          ' intentos'
+      );
+      
+      await userDataManager.removeServer(url);
+      this.health.delete(url);
+      quedan -= 1;
+      
+      // Se cierra lo que quede colgando de esa URL. Los reintentos se cortan solos:
+      // scheduleReconnection comprueba contra la lista antes de volver a marcar.
+      const ws = this.activeConnections.get(url);
+      if (ws) ws.close();
+      this.activeConnections.delete(url);
+      if (window.activeConnections) {
+        window.activeConnections.delete(url);
+      }
+      this.connectingServers.delete(url);
+      this.cleanupConnectionTimers(url);
+      this.retryCounts.delete(url);
+    }
+    
+    await this.saveServerHealth();
+  }
+
+  private async reconnectEverything(): Promise<void> {
+    const urls = new Set<string>(this.activeConnections.keys());
+    this.connectingServers.forEach((_startedAt, url) => urls.add(url));
+    
+    // El vigilante no puede quedarse quieto porque falle una consulta: si la lista de
+    // servidores no se puede leer, igual se rehacen las conexiones que ya se conocen.
+    try {
+      const userDataManager = serviceRegistry.get<any>('userDataManager');
+      if (userDataManager && typeof userDataManager.getServers === 'function') {
+        const servers = await userDataManager.getServers();
+        servers.forEach((url: string) => urls.add(url));
+      }
+    } catch (error) {
+      console.error('Error getting servers for reconnection:', error);
+    }
+    
+    urls.forEach((url) => this.forceReconnect(url));
   }
 
   private async scheduleReconnection(url: string, _event: CloseEvent): Promise<void> {
