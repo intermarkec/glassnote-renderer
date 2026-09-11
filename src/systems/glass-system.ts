@@ -289,20 +289,42 @@ class Glass {
    * al segundo fijo de antes, porque ahora la entrada dura lo que diga el mensaje.
    */
   private animarEntrada(glassContent: HTMLElement, data: any): void {
+    // El elemento arranca en opacidad 0 y solo la entrada lo hace visible. Si nunca
+    // llega a tener medidas, este bucle gira hasta que el glass se retira solo: el
+    // mensaje no se ve NUNCA y hasta ahora eso no dejaba una sola linea. Se avisa a los
+    // dos segundos, con las medidas a la vista, y se sigue esperando como antes.
+    const empezoAEsperar = Date.now()
+    let yaAvisoQueNoMide = false
+
     const arrancar = () => {
       if (this.isFinishing) return
 
       const contentRect = glassContent.getBoundingClientRect()
       if (contentRect.width <= 0 || contentRect.height <= 0) {
+        if (!yaAvisoQueNoMide && Date.now() - empezoAEsperar > 2000) {
+          yaAvisoQueNoMide = true
+          console.error(
+            `Glass ${data.id}: lleva 2 s sin medidas (${contentRect.width}x${contentRect.height}, ` +
+            `${glassContent.childElementCount} hijos); la entrada no arranca y se queda invisible`
+          )
+        }
         requestAnimationFrame(arrancar)
         return
       }
+
+      console.log(
+        `Glass ${data.id}: entrando ${Math.round(contentRect.width)}x${Math.round(contentRect.height)} ` +
+        `en (${Math.round(contentRect.left)},${Math.round(contentRect.top)}) de ` +
+        `${window.innerWidth}x${window.innerHeight} · posicion ${data.position} · ` +
+        `transicion ${JSON.stringify(this.transicion)} · opacidad final ${this.opacidadFinal}`
+      )
 
       animarFase(glassContent, this.transicion.in, 'entrada', {
         transformBase: this.transformBase,
         opacidadFinal: this.opacidadFinal
       }).then(() => {
         if (this.isFinishing) return
+        console.log(`Glass ${data.id}: entrada terminada, el mensaje esta en pantalla`)
         this._sendNotification('displayed')
         this._armarBotonDeConfirmacion(data)
       })

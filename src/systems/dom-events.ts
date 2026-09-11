@@ -310,7 +310,10 @@ document.addEventListener('DOMContentLoaded', function() {
   window.showSplash = function(): void {
     // En previsualizacion no hay saludo de arranque: la pagina embebe el renderer para
     // ver un mensaje, no para verlo presentarse.
-    if (esPreview()) return
+    if (esPreview()) {
+      console.log('showSplash: es previsualizacion, no va saludo de arranque')
+      return
+    }
     console.log('showSplash function called')
     loadSplashTemplate().then((template) => {
       console.log('Splash template loaded successfully')
@@ -349,7 +352,14 @@ document.addEventListener('DOMContentLoaded', function() {
       // This ensures preview messages go through the unified queue and duplicate detection
       // Use null for URL since this is a local preview
       if (window.Glass) {
-        console.log('Glass constructor available, creating glass')
+        // Que diga DONDE y POR CUANTO. El splash se mudo a la esquina de abajo a la
+        // derecha y se achico: "no se ve" y "se ve y no lo miraron" son dos reportes
+        // distintos, y sin estos numeros en el log no hay forma de separarlos.
+        console.log(
+          `showSplash: template ${template.length} chars · posicion ${glassConfig.data.position} · ` +
+          `${glassConfig.data.duration}s · transicion ${glassConfig.data.transition} · ` +
+          `ventana ${window.innerWidth}x${window.innerHeight}`
+        )
         new window.Glass(null, glassConfig)
         console.log('Glass created successfully')
       } else {

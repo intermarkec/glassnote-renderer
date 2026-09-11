@@ -40,6 +40,12 @@ export class HTMLProcessor {
       const htmlContent = htmlContentPromise instanceof Promise ? await htmlContentPromise : htmlContentPromise;
       const processedHtml = this._processVariables(htmlContent, data);
       if (!processedHtml || processedHtml.trim() === '') {
+        // Se resolvia callado y el glass seguia su camino: se agregaba vacio, se quedaba
+        // en opacidad 0 —nunca arranca la entrada sobre un elemento sin medidas— y a los
+        // `duration` segundos se limpiaba. En el log eso es un "Glass created
+        // successfully" y nada mas, que es lo que hace imposible distinguir "no se
+        // mostro" de "se mostro y no lo vieron".
+        console.error(`Glass ${data.id}: el html quedo vacio, no se dibuja nada`);
         return Promise.resolve();
       }
       // Las tipografías que pida este html, bajadas sólo si hacen falta. Vuelven en CSS
@@ -119,6 +125,10 @@ export class HTMLProcessor {
     const rootDiv = tempDiv.querySelector('div');
     
     if (!rootDiv) {
+      console.error(
+        `Glass ${data.id}: el html no tiene un <div> raiz, no se dibuja nada ` +
+        `(empieza con: ${htmlContent.slice(0, 80).replace(/\s+/g, ' ')})`
+      );
       return Promise.resolve();
     }
 
@@ -140,6 +150,13 @@ export class HTMLProcessor {
     const height = parseInt((heightAttr || heightStyleValue.toString() || '0'));
     
     if (width <= 0 || height <= 0) {
+      // El motivo numero uno de un glass html que "no se muestra": el div raiz sin ancho
+      // Y alto en pixeles. Se medía, daba 0 y se salia en silencio.
+      console.error(
+        `Glass ${data.id}: el div raiz del html no declara medidas en px ` +
+        `(width="${widthAttr}" style.width="${widthStyle}" · ` +
+        `height="${heightAttr}" style.height="${heightStyle}"), no se dibuja nada`
+      );
       return Promise.resolve();
     }
 
@@ -149,6 +166,12 @@ export class HTMLProcessor {
       width,
       height,
       scaleFactor
+    );
+
+    console.log(
+      `Glass ${data.id}: html ${width}x${height} → ${Math.round(dimensions.width)}x` +
+      `${Math.round(dimensions.height)} (x${dimensions.ratio.toFixed(3)}) en una ventana de ` +
+      `${window.innerWidth}x${window.innerHeight}`
     );
     
     const iframe = document.createElement('iframe');
@@ -186,7 +209,18 @@ export class HTMLProcessor {
 
     const rootDiv = tempContainer.firstElementChild as HTMLElement;
     if (rootDiv) {
-      rootDiv.style.fontSize = Math.round(100 * scaleFactor) + 'px';
+      // La base tipografica del arte. El 100 es el lienzo: las plantillas se dibujan con
+      // font-size:100px en su div raiz y todo lo demas en em, asi que reescribir esta sola
+      // medida escala el texto entero y las proporciones se conservan.
+      //
+      // SIN redondear. La caja se escala con el ratio exacto (calculateScaledDimensions) y
+      // si la tipografia usa el ratio redondeado al pixel entero, las dos derivan: medido
+      // sobre el renderer en 18 ventanas, el ancho de un texto se movia hasta un 0.8% de su
+      // caja segun la resolucion. No es cosmetico: de 21 cajas probadas alrededor del ancho
+      // natural de un texto, 7 entraban en una linea en unas pantallas y cortaban en dos en
+      // otras. Un glass no es responsive, es el mismo arte escalado, y eso lo rompia.
+      // Con el ratio exacto: 0 de 21. CSS acepta font-size fraccionario.
+      rootDiv.style.fontSize = 100 * scaleFactor + 'px';
       rootDiv.setAttribute('width', '100%');
       rootDiv.setAttribute('height', '100%');
     }
