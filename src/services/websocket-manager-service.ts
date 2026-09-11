@@ -39,6 +39,7 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
   // intentos lleva fallados desde entonces.
   private health: Map<string, ServerHealth> = new Map();
   private lastPurgeAt = 0;
+  private checkingServers = false;
 
   // Cuando se saca de la lista un servidor que nunca contesto. Ver purgeDeadServers().
   private static readonly PURGE_AFTER_MS = 7 * 24 * 3600 * 1000;
@@ -201,9 +202,16 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     this.cleanupConnectionTimers(url);
     this.retryCounts.delete(url);
     
-    setTimeout(() => {
-      this.connect(url);
-    }, 1000);
+    // Se anota en reconnectTimers y no en un setTimeout suelto: es la unica forma de que
+    // ensureEveryServerConnected sepa que este servidor ya tiene un intento en camino y
+    // no abra un segundo socket encima.
+    this.reconnectTimers.set(
+      url,
+      setTimeout(() => {
+        this.reconnectTimers.delete(url);
+        this.connect(url);
+      }, 1000)
+    );
   }
 
   /**
@@ -756,6 +764,10 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
       this.forceReconnect(url);
     });
     
+    this.ensureEveryServerConnected().catch((error) =>
+      console.error('Error checking servers are connected:', error)
+    );
+    
     this.activeConnections.forEach((ws, url) => {
       if (ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) {
         console.warn('El socket de ' + url + ' esta cerrado y no lo aviso; se reconecta');
@@ -902,6 +914,49 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     await this.saveServerHealth();
   }
 
+  /**
+   * Que todo servidor de la lista tenga conexion, o al menos un intento en camino.
+   *
+   * El resto del vigilante mira los mapas en memoria, y por eso no vio la unica caida que
+   * de verdad paso en produccion: al reiniciarse la API el socket se cerro LIMPIO,
+   * handleConnectionClose lo saco de activeConnections y de connectingServers, y dejo el
+   * reintento en manos de scheduleReconnection. Cuando ese reintento se pierde —su
+   * consulta de la lista devuelve vacio, o el connect() que programo se va por la guarda
+   * de connectingServers— no queda NADA en los mapas: cero conexiones, cero intentos, y
+   * un vigilante que recorre dos mapas vacios y no encuentra trabajo. El equipo estuvo
+   * cuatro minutos sin conexion y sin una sola linea en el log, hasta que alguien abrio
+   * el menu y leyo "No active connections available".
+   *
+   * La lista de servidores es la unica fuente que no se vacia sola. Se parte de ahi.
+   */
+  private async ensureEveryServerConnected(): Promise<void> {
+    if (this.checkingServers) return;
+    this.checkingServers = true;
+    
+    try {
+      const userDataManager = serviceRegistry.get<any>('userDataManager');
+      if (!userDataManager || typeof userDataManager.getServers !== 'function') return;
+      
+      const servers: string[] = await userDataManager.getServers();
+      for (const url of servers) {
+        const readyState = this.activeConnections.get(url)?.readyState;
+        if (readyState === WebSocket.OPEN || readyState === WebSocket.CONNECTING) continue;
+        
+        // Estos dos ya tienen quien los mire: la conexion colgada la destraba el chequeo
+        // de los 20 s, y el reintento programado tiene su propio reloj.
+        if (this.connectingServers.has(url)) continue;
+        if (this.reconnectTimers.has(url)) continue;
+        
+        console.warn(
+          'El servidor ' + url + ' no tiene conexion ni reintento en camino; se levanta'
+        );
+        this.connect(url);
+      }
+    } finally {
+      this.checkingServers = false;
+    }
+  }
+
   private async reconnectEverything(): Promise<void> {
     const urls = new Set<string>(this.activeConnections.keys());
     this.connectingServers.forEach((_startedAt, url) => urls.add(url));
@@ -928,7 +983,11 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     if (userDataManager && typeof userDataManager.getServers === 'function') {
       try {
         const servers = await userDataManager.getServers();
-        if (!servers.includes(url)) {
+        // El `servers.length` no sobra: si la consulta devuelve vacio —el IPC que falla,
+        // el archivo que todavia no se leyo— esto daba por borrado un servidor que sigue
+        // en la config, y abandonaba el reintento en silencio y para siempre. Solo se
+        // abandona cuando la lista se pudo leer Y el servidor no esta en ella.
+        if (servers.length && !servers.includes(url)) {
           return;
         }
       } catch (error) {
@@ -952,7 +1011,7 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
           if (userDataManager) {
             try {
               const servers = await userDataManager.getServers();
-              if (!servers.includes(url)) {
+              if (servers.length && !servers.includes(url)) {
                 return;
               }
             } catch (error) {
@@ -978,7 +1037,7 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
         if (userDataManager) {
           try {
             const servers = await userDataManager.getServers();
-            if (!servers.includes(url)) {
+            if (servers.length && !servers.includes(url)) {
               return;
             }
           } catch (error) {
