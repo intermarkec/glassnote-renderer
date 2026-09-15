@@ -84,8 +84,9 @@ function addToUnifiedQueue(url: string | null, message: any): void {
     timestamp: Date.now()
   })
   
-  // Reproducir sonido de cola cuando se agrega un mensaje a la cola (siempre)
-  if (typeof window.playQueueSound === 'function') {
+  // Reproducir sonido de cola cuando se agrega un mensaje a la cola. El splash no: suena
+  // solo con el suyo, cuando aparece (ver sonarAviso en glass-system).
+  if (message.data.sound !== 'splash' && typeof window.playQueueSound === 'function') {
     window.playQueueSound()
   }
  
@@ -343,6 +344,9 @@ document.addEventListener('DOMContentLoaded', function() {
           baseUrl: './',
           parameters: JSON.stringify([{"label":"html","value":template}]),
           messageType: 'html',
+          // Suena con sound/splash.mp3 al aparecer, y con ningun otro: ni el de la cola ni
+          // el del glass. Ver addToUnifiedQueue y sonarAviso en glass-system.
+          sound: 'splash',
         },
       }
 

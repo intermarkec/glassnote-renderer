@@ -53,9 +53,12 @@ export class SoundSystemService extends BaseService implements ISoundSystem {
 
     try {
       let soundFile: string;
-      
+
       // Determine which sound file to use based on platform
-      if (typeof window.AndroidBridge !== 'undefined') {
+      if (soundType === 'splash') {
+        // El saludo de arranque tiene su propio sonido, el mismo en todas las plataformas.
+        soundFile = './sound/splash.mp3';
+      } else if (typeof window.AndroidBridge !== 'undefined') {
         // Android with AndroidBridge
         soundFile = soundType === 'glass' ? './sound/glasscell.wav' : './sound/queuecell.wav';
       } else {
@@ -124,7 +127,8 @@ export class SoundSystemService extends BaseService implements ISoundSystem {
       './sound/glasscell.wav',
       './sound/glasscell2.wav',
       './sound/queue.wav',
-      './sound/queuecell.wav'
+      './sound/queuecell.wav',
+      './sound/splash.mp3'
     ];
 
     // Create audio elements to preload (but don't play them)

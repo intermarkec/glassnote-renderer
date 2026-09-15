@@ -113,7 +113,16 @@ class Glass {
    */
   private sonarAviso(): void {
     const soundSystem = serviceRegistry.get<any>('soundSystem');
-    if (soundSystem && typeof soundSystem.playGlassSound === 'function') {
+    if (!soundSystem) return;
+
+    // El splash suena con el suyo y con ningun otro (ver showSplash en dom-events).
+    const data: any = this.message && this.message.data;
+    if (data && data.sound === 'splash') {
+      if (typeof soundSystem.playSound === 'function') soundSystem.playSound('splash');
+      return;
+    }
+
+    if (typeof soundSystem.playGlassSound === 'function') {
       soundSystem.playGlassSound();
     }
   }
