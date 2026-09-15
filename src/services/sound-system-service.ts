@@ -1,5 +1,6 @@
 import { BaseService } from './base-service';
 import { ISoundSystem } from './interfaces';
+import { esPreview } from '../utils/preview';
 
 interface AudioInstances {
   [key: string]: HTMLAudioElement;
@@ -45,6 +46,11 @@ export class SoundSystemService extends BaseService implements ISoundSystem {
    * Play a sound by type
    */
   playSound(soundType: string): void {
+    // En la previsualizacion de la web (?preview=1) no suena nada: el que la mira esta
+    // armando el mensaje, y la noticia en vivo repone el glass en bucle, con lo cual el
+    // aviso sonaria una y otra vez. Un equipo nunca carga con ?preview=1.
+    if (esPreview()) return;
+
     try {
       let soundFile: string;
       
