@@ -7,6 +7,8 @@ import { asegurarFuentes, familiasQuePide, origenDeFuentes } from '../../service
 import { FileLoader } from './file-loader';
 import { serviceRegistry } from '../../services/registry';
 import { IPassthroughService } from '../../services/interfaces';
+import { esPreview } from '../../utils/preview';
+import { prepareYoutubeFrames, YOUTUBE_FRAME_ORIGINS } from './youtube';
 
 interface GlassInstance {
   img: HTMLElement;
@@ -191,7 +193,7 @@ export class HTMLProcessor {
     iframe.style.border = 'none';
     iframe.style.pointerEvents = 'auto';
     
-    iframe.srcdoc = this._wrapHtmlInSafeDocument(htmlContent, dimensions.ratio, dimensions.width, dimensions.height, cssDeFuentes);
+    iframe.srcdoc = this._wrapHtmlInSafeDocument(htmlContent, dimensions.ratio, dimensions.width, dimensions.height, cssDeFuentes, data.id);
 
     glassContent.appendChild(iframe);
     
@@ -203,7 +205,7 @@ export class HTMLProcessor {
     return Promise.resolve();
   }
 
-  private _wrapHtmlInSafeDocument(htmlContent: string, scaleFactor: number, originalWidth: number, originalHeight: number, cssDeFuentes: string = ''): string {
+  private _wrapHtmlInSafeDocument(htmlContent: string, scaleFactor: number, originalWidth: number, originalHeight: number, cssDeFuentes: string = '', glassId?: any): string {
     const tempContainer = document.createElement('div');
     tempContainer.innerHTML = htmlContent;
 
@@ -223,6 +225,13 @@ export class HTMLProcessor {
       rootDiv.style.fontSize = 100 * scaleFactor + 'px';
       rootDiv.setAttribute('width', '100%');
       rootDiv.setAttribute('height', '100%');
+    }
+
+    // Los videos de YouTube: el src del editor no arranca solo y un glass no se toca. Ver
+    // youtube.ts. Sin sonido en la previsualizacion, como el resto de los avisos.
+    const videos = prepareYoutubeFrames(tempContainer, { muted: esPreview() });
+    if (videos.length > 0) {
+      console.log(`Glass ${glassId}: ${videos.length} video(s) de YouTube: ${videos.map((video) => video.id).join(', ')}`);
     }
 
     let modifiedHtml = tempContainer.innerHTML;
@@ -526,7 +535,7 @@ export class HTMLProcessor {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' 'unsafe-eval' 'self'; style-src 'unsafe-inline' 'self'; default-src 'self' data: blob:;">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' 'unsafe-eval' 'self'; style-src 'unsafe-inline' 'self'; default-src 'self' data: blob:; frame-src 'self' data: blob: ${YOUTUBE_FRAME_ORIGINS.join(' ')};">
     <style>${kinetikaCss}</style>
     <style>${cssDeFuentes}</style>
     <style>
