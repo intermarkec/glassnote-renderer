@@ -435,16 +435,9 @@ class Glass {
       this._sendNotification('success', responseData)
     }
     
-    // Remove from unified queue when glass finishes displaying
-    if (window.removeFromUnifiedQueue && this.message && this.message.data) {
-      if (this.message.data.messageId) {
-        console.log('Removing from unified queue, messageId:', this.message.data.messageId);
-        window.removeFromUnifiedQueue(this.message.data.messageId)
-      } else if (this.message.data.id) {
-        console.log('Removing from unified queue, id:', this.message.data.id.toString());
-        window.removeFromUnifiedQueue(this.message.data.id.toString())
-      }
-    }
+    // Aca no se toca la cola unificada: este glass salio de ella al mostrarse. Antes se
+    // borraba "por messageId", que es el del mensaje y no el de la transaccion, y se
+    // llevaba otro envio del mismo mensaje que esperaba turno: quedaba SENDED para siempre.
 
     // Cancel duration timeout
     if (this.durationTimeout) {

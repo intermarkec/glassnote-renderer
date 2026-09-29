@@ -169,9 +169,11 @@ function processUnifiedQueue(): void {
     const glassData = queueCopy[i]
     
     if (canDisplayGlass(glassData)) {
-      // Remover de la cola antes de procesar para evitar loops infinitos
-      const messageId = glassData.message.data.messageId
-      removeFromUnifiedQueue(messageId)
+      // Remover de la cola antes de procesar para evitar loops infinitos. Se saca ESTE
+      // item y no "el del mismo messageId": messageId es el del mensaje, no el de la
+      // transaccion, y dos envios del mismo mensaje lo comparten.
+      const index = window.unifiedGlassQueue.indexOf(glassData)
+      if (index !== -1) window.unifiedGlassQueue.splice(index, 1)
       
       // Use original constructor to display (bypass unified queue)
       new originalGlassConstructor(glassData.url, glassData.message)
