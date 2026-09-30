@@ -310,7 +310,14 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Global function to show splash
+  let splashMostrado = false
   window.showSplash = function(): void {
+    // Un saludo por arranque, lo llame quien lo llame.
+    if (splashMostrado) {
+      console.log('showSplash: ya se mostro en esta carga')
+      return
+    }
+    splashMostrado = true
     // En previsualizacion no hay saludo de arranque: la pagina embebe el renderer para
     // ver un mensaje, no para verlo presentarse.
     if (esPreview()) {
@@ -376,12 +383,10 @@ document.addEventListener('DOMContentLoaded', function() {
     })
   }
 
-  // Show splash immediately on DOM ready (for backward compatibility)
-  setTimeout(() => {
-    if (window.showSplash) {
-      window.showSplash()
-    }
-  }, 100)
+  // El splash lo lanza App.vue una vez montado. Aca habia una segunda llamada "por
+  // compatibilidad" que salio siempre doble: hasta 2.3.0 no se notaba porque la cola sacaba
+  // de un golpe todo lo que tuviera el mismo messageId, y 2.3.1 dejo de hacerlo (con razon:
+  // perdia envios reales del mismo mensaje).
   
   const testButton = document.getElementById('testButton')
   if (testButton) {
