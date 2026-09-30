@@ -102,6 +102,16 @@ export class PassthroughService extends BaseService {
   public unregisterElement(id: string): void {
     if (this.elements.delete(id)) {
       // console.log(`PassthroughService: Unregistered element "${id}"`);
+
+      // Un formulario se cierra con el cursor ENCIMA: el ultimo clic es el que lo manda.
+      // El iframe sale del documento sin que su mouseleave llegue nunca, y el "estoy sobre
+      // el iframe" quedaba en true para siempre: el overlay seguia comiendo clics con el
+      // formulario ya cerrado, y tambien sobre los glasses de imagen que vinieran despues,
+      // hasta reiniciar el cliente.
+      if (this.currentIframeId === id) {
+        this.isMouseOverIframe = false;
+        this.currentIframeId = null;
+      }
       
       // Recalculate passthrough state
       this.checkAndUpdatePassthrough();
@@ -199,6 +209,11 @@ export class PassthroughService extends BaseService {
    */
   private setupMouseTracking(): void {
     document.addEventListener('mousemove', (event) => {
+      // Los movimientos sobre un iframe los recibe SU documento, no este: si este se entero,
+      // el cursor ya no esta sobre ningun iframe. No se espera al mouseleave del iframe,
+      // que no llega cuando el sistema le da el mouse a otra ventana al salir.
+      this.isMouseOverIframe = false;
+      this.currentIframeId = null;
       this.lastMousePosition = {
         x: event.clientX,
         y: event.clientY
@@ -414,4 +429,4 @@ declare global {
 }
 
 // Initialize global instance
-window.passthroughService = PassthroughService.getInstance();
+window.passthroughService = PassthroughService.getInstance();
