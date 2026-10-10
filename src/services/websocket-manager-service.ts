@@ -976,6 +976,18 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     urls.forEach((url) => this.forceReconnect(url));
   }
 
+  /**
+   * La espera con azar: entre la mitad y una vez y media de la nominal.
+   *
+   * Cuando el servidor se reinicia, a todos los equipos se les corta el socket en el
+   * mismo instante. Con esperas fijas volvian todos juntos, segundo a segundo, y esa
+   * avalancha es justo lo que el servidor no aguanta. Con azar cada equipo cae en un
+   * momento distinto y la misma cantidad de reconexiones llega repartida.
+   */
+  private static withJitter(nominalMs: number, random: number = Math.random()): number {
+    return Math.round(nominalMs * (0.5 + random));
+  }
+
   private async scheduleReconnection(url: string, _event: CloseEvent): Promise<void> {
     // Get userDataManager from service registry
     const userDataManager = serviceRegistry.get<any>('userDataManager');
@@ -1001,7 +1013,7 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     if (nextRetryCount > 5) {
       this.retryCounts.set(url, nextRetryCount);
       
-      const periodicRetryTime = 300000;
+      const periodicRetryTime = WebSocketManagerService.withJitter(300000);
       
       console.log('Switching to 5-minute periodic retry for persistent connection failure: ' + url);
       
@@ -1029,7 +1041,9 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     
     const baseDelay = 5000;
     const maxDelay = 300000;
-    const backoffTime = Math.min(baseDelay * Math.pow(2, nextRetryCount - 1), maxDelay);
+    const backoffTime = WebSocketManagerService.withJitter(
+      Math.min(baseDelay * Math.pow(2, nextRetryCount - 1), maxDelay)
+    );
     
     this.reconnectTimers.set(
       url,
