@@ -34,6 +34,14 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
   private static readonly CLOCK_JUMP_MS = 120000;
   private static readonly CONNECTING_TIMEOUT_MS = 20000;
 
+  // Abrir el socket no prueba que el servidor nos acepte: con un equipo sin organizacion
+  // la API contesta el 101 y cierra con 1008 en el acto. Si el contador de reintentos se
+  // borrara en onopen, cada rechazo volveria a ser el primer reintento y el equipo
+  // golpearia cada 5 s para siempre (prod, 2026-10-20: ~15.000 conexiones en un dia de
+  // un solo UUID). Solo una conexion que aguanta este tiempo abierta borra el contador.
+  private static readonly STABLE_CONNECTION_MS = 30000;
+  private openedAt: Map<string, number> = new Map();
+
   // Salud de cada servidor de la lista, guardada en userData para que sobreviva a los
   // reinicios: cuando se lo vio por primera vez, cuando conecto por ultima vez y cuantos
   // intentos lleva fallados desde entonces.
@@ -408,7 +416,7 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
       this.reconnectTimers.delete(url);
     }
     
-    this.retryCounts.delete(url);
+    this.openedAt.set(url, Date.now());
     this.lastSeenAt.set(url, Date.now());
     this.markServerConnected(url);
     
@@ -462,6 +470,13 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     }
     
     this.cleanupConnectionTimers(url);
+
+    const openedAt = this.openedAt.get(url);
+    this.openedAt.delete(url);
+    if (openedAt !== undefined && Date.now() - openedAt >= WebSocketManagerService.STABLE_CONNECTION_MS) {
+      this.retryCounts.delete(url);
+    }
+
     this.markServerFailure(url);
     this.scheduleReconnection(url, event);
   }
