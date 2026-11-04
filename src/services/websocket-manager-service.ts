@@ -54,6 +54,21 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
   private static readonly PURGE_AFTER_FAILURES = 100;
   private static readonly PURGE_CHECK_MS = 3600000;
 
+  // DIRECTORIO (login central): a que servidores pertenece este equipo. Cada organizacion
+  // vive en un servidor, y cuando una se muda (MARESA) el equipo tiene que enterarse solo,
+  // sin reemparejar: pregunta, agrega el servidor nuevo y entra con su uuid, que es lo que
+  // el protocolo ya acepta en un servidor que lo conoce.
+  //
+  // LISTA BLANCA: multiservidor no es cualquier servidor. Solo se acepta lo que viene por
+  // wss:// a un host de esta lista. Un equipo con una direccion fuera de ella (una IP de la
+  // LAN puesta a mano con --ws-url) no se toca: el directorio no sabe nada de ese montaje.
+  private static readonly DIRECTORY_URL = 'https://glassnoteapi.intermark.ec/glassnote-auth';
+  private static readonly ALLOWED_SERVER_HOST_SUFFIXES = ['.intermark.ec'];
+  private static readonly DIRECTORY_FIRST_MS = 60000;
+  private static readonly DIRECTORY_EVERY_MS = 6 * 3600 * 1000;
+  private directoryTimer: ReturnType<typeof setInterval> | null = null;
+  private reconcilingDirectory = false;
+
   constructor() {
     super('websocketManager');
   }
@@ -72,6 +87,8 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
     await this.loadServerHealth();
     setTimeout(() => this.autoConnectToServers(), 2000);
     this.startWatchdog();
+    setTimeout(() => this.reconcileWithDirectory(), WebSocketManagerService.DIRECTORY_FIRST_MS);
+    this.directoryTimer = setInterval(() => this.reconcileWithDirectory(), WebSocketManagerService.DIRECTORY_EVERY_MS);
   }
 
   /**
@@ -79,6 +96,8 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
    */
   protected async onCleanup(): Promise<void> {
     this.stopWatchdog();
+    if (this.directoryTimer) clearInterval(this.directoryTimer);
+    this.directoryTimer = null;
     
     // Close all connections
     this.activeConnections.forEach((ws, _url) => {
@@ -909,24 +928,115 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
           ' intentos'
       );
       
-      await userDataManager.removeServer(url);
-      this.health.delete(url);
+      await this.forgetServer(url);
       quedan -= 1;
-      
-      // Se cierra lo que quede colgando de esa URL. Los reintentos se cortan solos:
-      // scheduleReconnection comprueba contra la lista antes de volver a marcar.
-      const ws = this.activeConnections.get(url);
-      if (ws) ws.close();
-      this.activeConnections.delete(url);
-      if (window.activeConnections) {
-        window.activeConnections.delete(url);
-      }
-      this.connectingServers.delete(url);
-      this.cleanupConnectionTimers(url);
-      this.retryCounts.delete(url);
     }
     
     await this.saveServerHealth();
+  }
+
+  /**
+   * Saca un servidor de la lista y cierra lo que quede colgando de esa URL. Los reintentos
+   * se cortan solos: scheduleReconnection comprueba contra la lista antes de volver a marcar.
+   */
+  private async forgetServer(url: string): Promise<void> {
+    const userDataManager = serviceRegistry.get<any>('userDataManager');
+    if (userDataManager && typeof userDataManager.removeServer === 'function') {
+      await userDataManager.removeServer(url);
+    }
+    this.health.delete(url);
+    const ws = this.activeConnections.get(url);
+    if (ws) ws.close();
+    this.activeConnections.delete(url);
+    if (window.activeConnections) {
+      window.activeConnections.delete(url);
+    }
+    this.connectingServers.delete(url);
+    this.cleanupConnectionTimers(url);
+    this.retryCounts.delete(url);
+  }
+
+  /** wss:// a un host de la lista blanca. Cualquier otra cosa no es un servidor nuestro. */
+  static isAllowedServerUrl(url: string): boolean {
+    try {
+      const u = new URL(url);
+      if (u.protocol !== 'wss:') return false;
+      const host = u.hostname.toLowerCase();
+      return WebSocketManagerService.ALLOWED_SERVER_HOST_SUFFIXES.some(
+        (sufijo) => host.endsWith(sufijo) && host.length > sufijo.length
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Pregunta al directorio a que servidores pertenece este equipo y ajusta la lista.
+   *
+   *   - AGREGA lo que el directorio da y no esta, si pasa la lista blanca. Sin tokens para
+   *     esa URL, getProtocolData entra con el uuid, y ese servidor da los suyos.
+   *   - SACA un servidor solo si: el directorio conoce al equipo (complete), dio al menos
+   *     uno, el que se saca es nuestro (lista blanca), y el equipo YA se conecto bien a uno
+   *     de los que el directorio dio. Ante la duda —directorio caido, respuesta vacia,
+   *     servidor nuevo que todavia no contesto— no se toca nada. Nunca el ultimo.
+   *   - Si en la lista hay una direccion fuera de la lista blanca, no se hace nada.
+   */
+  async reconcileWithDirectory(): Promise<void> {
+    if (this.reconcilingDirectory || esPreview()) return;
+    this.reconcilingDirectory = true;
+    try {
+      const userDataManager = serviceRegistry.get<any>('userDataManager');
+      if (!userDataManager || typeof userDataManager.getServers !== 'function') return;
+      const servers: string[] = await userDataManager.getServers();
+      if (servers.some((url) => !WebSocketManagerService.isAllowedServerUrl(url))) return;
+
+      const uuid = window.uuid || (await userDataManager.getUUID());
+      if (!uuid || !/^[0-9a-fA-F-]{8,64}$/.test(uuid)) return;
+
+      const base = (window as any).DIRECTORY_URL || WebSocketManagerService.DIRECTORY_URL;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      let body: any;
+      try {
+        const res = await fetch(`${base}/devices/${encodeURIComponent(uuid)}/servers`, {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        body = await res.json();
+      } catch {
+        return;
+      } finally {
+        clearTimeout(timer);
+      }
+      if (!body || body.complete !== true || !Array.isArray(body.servers)) return;
+
+      const dados: string[] = body.servers
+        .map((s: any) => (s && typeof s.wsUrl === 'string' ? s.wsUrl : ''))
+        .filter((url: string) => WebSocketManagerService.isAllowedServerUrl(url));
+      if (!dados.length) return;
+
+      for (const url of dados) {
+        if (servers.includes(url)) continue;
+        console.log('Directorio: este equipo pertenece tambien a ' + url + '; se agrega');
+        await userDataManager.addServer(url);
+        this.connect(url);
+      }
+
+      const yaConecto = dados.some((url) => !!this.health.get(url)?.lastConnectedAt);
+      if (!yaConecto) return;
+      const actuales: string[] = await userDataManager.getServers();
+      let quedan = actuales.length;
+      for (const url of actuales) {
+        if (dados.includes(url) || quedan <= 1) continue;
+        console.warn('Directorio: este equipo ya no pertenece a ' + url + '; se saca de la lista');
+        await this.forgetServer(url);
+        quedan -= 1;
+      }
+      await this.saveServerHealth();
+    } finally {
+      this.reconcilingDirectory = false;
+    }
   }
 
   /**
