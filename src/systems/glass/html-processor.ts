@@ -196,6 +196,7 @@ export class HTMLProcessor {
     iframe.srcdoc = this._wrapHtmlInSafeDocument(htmlContent, dimensions.ratio, dimensions.width, dimensions.height, cssDeFuentes, data.id);
 
     glassContent.appendChild(iframe);
+    this._setupExternalLinks(iframe);
     
     if (glassContent.dataset.isForm === 'true') {
       this._enableFormTouch(glassContent);
@@ -203,6 +204,44 @@ export class HTMLProcessor {
     }
     
     return Promise.resolve();
+  }
+
+  /**
+   * Enlaces externos del arte: un <a href> o un boton con la clase Link del editor (la URL
+   * va en su atributo value). Antes no habia manejador y el clic no hacia nada en el
+   * equipo. Abre el navegador del sistema; en la previsualizacion del panel, otra pestana.
+   */
+  private _setupExternalLinks(iframe: HTMLIFrameElement): void {
+    const abrir = (url: string) => {
+      const w = window as any;
+      try {
+        if (!esPreview() && w.electronAPI?.openExternal) return w.electronAPI.openExternal(url);
+        if (!esPreview() && w.AndroidBridge?.openExternal) return w.AndroidBridge.openExternal(url);
+        window.open(url, '_blank', 'noopener');
+      } catch (error) {
+        console.error('No se pudo abrir el enlace externo:', url, error);
+      }
+    };
+    const instalar = () => {
+      const doc = iframe.contentDocument;
+      if (!doc || (doc as any).__glassnoteLinks) return;
+      (doc as any).__glassnoteLinks = true;
+      doc.addEventListener('click', (event) => {
+        const el = (event.target as Element | null)?.closest?.('a[href], .Link');
+        if (!el) return;
+        let url = el.tagName === 'A'
+          ? (el.getAttribute('href') || '')
+          : (el.getAttribute('value') || el.textContent || '').trim();
+        if (el.tagName !== 'A' && url && !/^https?:\/\//i.test(url)) url = `https://${url}`;
+        if (!/^https?:\/\//i.test(url)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        console.log(`Glass: abriendo enlace externo ${url}`);
+        abrir(url);
+      }, true);
+    };
+    iframe.addEventListener('load', instalar);
+    instalar();
   }
 
   private _wrapHtmlInSafeDocument(htmlContent: string, scaleFactor: number, originalWidth: number, originalHeight: number, cssDeFuentes: string = '', glassId?: any): string {
