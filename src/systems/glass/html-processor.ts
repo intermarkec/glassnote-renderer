@@ -238,6 +238,15 @@ export class HTMLProcessor {
         event.stopPropagation();
         console.log(`Glass: abriendo enlace externo ${url}`);
         abrir(url);
+        // Abierto el enlace, el glass se cierra como con Submit: queda como leido y la
+        // respuesta dice que enlace se abrio.
+        try {
+          this.glass.formResponse = { response: { link: url } };
+          if (iframe.closest('[data-is-form="true"]')) this._unregisterFormFromService();
+          this.glass.finishGlass();
+        } catch (error) {
+          console.error('No se pudo cerrar el glass tras abrir el enlace:', error);
+        }
       }, true);
     };
     iframe.addEventListener('load', instalar);
