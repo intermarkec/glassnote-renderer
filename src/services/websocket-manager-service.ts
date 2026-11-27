@@ -390,6 +390,7 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
       window.activeConnections.set(url, ws);
       
       this.handleConnectionSuccess(url, ws);
+      this.scheduleVersionReport(url, ws);
     };
     
     ws.onclose = (event: CloseEvent) => {
@@ -477,6 +478,36 @@ export class WebSocketManagerService extends BaseService implements IWebSocketMa
         }
       }, 60000)
     );
+  }
+
+  /**
+   * Le dice al servidor qué versión de renderer y de cliente corre este equipo. Sin esto la
+   * base se enteraba solo por el reporte HTTP del cliente (al arrancar y cada 6 h): un
+   * renderer recién actualizado seguía figurando con la versión vieja hasta el siguiente.
+   * Espera unos segundos porque el servidor asocia el socket al equipo de forma asíncrona
+   * durante el handshake, y un mensaje que llega antes se descarta. Un servidor sin el
+   * evento `report_version` simplemente lo ignora.
+   */
+  private scheduleVersionReport(url: string, ws: WebSocket): void {
+    const send = (attempt: number) => {
+      if (ws.readyState !== WebSocket.OPEN || this.activeConnections.get(url) !== ws) return;
+      const rendererVersion = window.rendererVersion;
+      if (!rendererVersion || rendererVersion === 'TEMPORAL') {
+        // La versión del renderer se lee al arrancar; si todavía no llegó, se reintenta.
+        if (attempt < 5) setTimeout(() => send(attempt + 1), 5000);
+        return;
+      }
+      try {
+        ws.send(JSON.stringify({
+          event: 'report_version',
+          data: { rendererVersion, version: window.appVersion || undefined },
+        }));
+        console.log(`[websocket] versión reportada a ${url}: renderer ${rendererVersion}, cliente ${window.appVersion || '?'}`);
+      } catch (error) {
+        console.error('[websocket] no se pudo reportar la versión:', error);
+      }
+    };
+    setTimeout(() => send(0), 5000);
   }
 
   private handleConnectionClose(url: string, event: CloseEvent): void {
